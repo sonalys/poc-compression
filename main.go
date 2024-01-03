@@ -211,19 +211,6 @@ func reconstruct(in block) []byte {
 	return out
 }
 
-// func reconstruct(in block) (out []byte) {
-// 	out = make([]byte, 0, len(in))
-// 	prevPos := 0
-// 	for _, entry := range entries {
-// 		curPos := int(entry.Position)
-// 		out = append(out, in[prevPos:curPos]...)
-// 		out = append(out, bytes.Repeat([]byte{entry.Byte}, int(entry.Size))...)
-// 		prevPos = curPos
-// 	}
-// 	out = append(out, in[prevPos:]...)
-// 	return
-// }
-
 func countBytes(input []byte) (repetition []uint) {
 	repetition = make([]uint, 256)
 	for _, char := range input {
