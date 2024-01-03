@@ -11,20 +11,23 @@ import (
 // I am thinking in doing the following:
 // Address	|	[file.gompressed]	|	size
 // 0x0000			block.size					4 bytes
-// SEGMENT SECTION [ 5 + 4 * pos + data bytes ]
+// SEGMENT SECTION [ 7 + (4 * pos) + data bytes ]
 // +4					segment.repeat			2 bytes
 // +2					segment.pos.len			1 byte
 // +1					segment.buf.len			4 bytes
 // +4		 			segment.pos					LEN * 4 bytes
 // +LEN				segment.buf					LEN bytes
 type segment struct {
+	// positions should hold at max 255 positions.
 	positions []uint32
 	repeat    uint16
-
+	// buffer can hold at maximum 4294967295 bytes, or 4.294967 gigabytes.
 	buffer []byte
 	// no need to serialize these fields on disk.
 	previous, next *segment
 }
+
+// My cats are still trying to reach to me about how to increase segments efficiency in disk, so stay tuned.
 
 type block struct {
 	size uint32

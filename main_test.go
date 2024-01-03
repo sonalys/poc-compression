@@ -86,7 +86,7 @@ func Test_serializeParse(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to read file: %s", err)
 		}
-		block := compress(in, 10)
+		block := compress(in, 12)
 		serialize := block.serialize()
 		ratio := float64(len(serialize)) / float64(len(in))
 		if ratio > 1 {
