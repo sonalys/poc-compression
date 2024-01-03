@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"fmt"
 	"os"
@@ -35,15 +36,9 @@ func Test_RandomFile(t *testing.T) {
 func Test_compressRepetition(t *testing.T) {
 	t.Run("small sequences", func(t *testing.T) {
 		in := []byte{0, 1, 1, 1, 0, 2, 2, 0, 3, 3, 0}
-		entries, out := compressRepetition(in, 1)
-		if len(entries) != 3 {
-			t.Error("invalid entries")
-		}
-		if len(out) != 4 {
-			t.Error("invalid out")
-		}
+		block := compress(in, 1)
 
-		rec := reconstruct(out, entries)
+		rec := reconstruct(block)
 
 		if len(rec) != len(in) {
 			t.Fatal("failed reconstruct size")
@@ -61,13 +56,19 @@ func Test_compressRepetition(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to read file: %s", err)
 		}
-		entries, out := compressRepetition(in, entrySize)
-		compressedSize := len(entries)*int(entrySize) + len(out)
-		if len(in) < compressedSize {
-			t.Errorf("compressed size %d should be smaller than original %d", len(in), compressedSize)
+		block := compress(in, 10)
+
+		serialized := block.serialize()
+
+		if len(serialized) > len(in) {
+			t.Fatalf("compression is bigger: original %d bytes compressed %d bytes. ratio %.2f", len(in), len(serialized), float64(len(serialized))/float64(len(in)))
 		}
-		t.Logf("original: %d compressed: %d ratio: %.2f", len(in), compressedSize, float64(compressedSize)/float64(len(in)))
-		rec := reconstruct(out, entries)
+		// compressedSize := len(entries)*int(entrySize) + len(out)
+		// if len(in) < compressedSize {
+		// 	t.Errorf("compressed size %d should be smaller than original %d", len(in), compressedSize)
+		// }
+		// t.Logf("original: %d compressed: %d ratio: %.2f", len(in), compressedSize, float64(compressedSize)/float64(len(in)))
+		rec := reconstruct(block)
 		if len(rec) != len(in) {
 			t.Error("invalid reconstruction size")
 		}
@@ -75,6 +76,30 @@ func Test_compressRepetition(t *testing.T) {
 			if rec[i] != in[i] {
 				t.Fatal("invalid reconstruction")
 			}
+		}
+	})
+}
+
+func Test_serializeParse(t *testing.T) {
+	t.Run("should return to same state", func(t *testing.T) {
+		in, err := os.ReadFile("/bin/zsh")
+		if err != nil {
+			t.Fatalf("failed to read file: %s", err)
+		}
+		block := compress(in, 10)
+		serialize := block.serialize()
+		ratio := float64(len(serialize)) / float64(len(in))
+		if ratio > 1 {
+			t.Errorf("compression increased file size. ratio: %.2f", ratio)
+		}
+		resp, err := parse(serialize)
+		if err != nil {
+			t.Fatalf("failed to parse serialize: %s", err)
+		}
+		serialize2 := resp.serialize()
+
+		if !bytes.Equal(serialize, serialize2) {
+			t.Fatal("buffer is variating in serialization")
 		}
 	})
 }
