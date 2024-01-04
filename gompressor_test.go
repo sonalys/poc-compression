@@ -1,4 +1,4 @@
-package main
+package gompressor
 
 import (
 	"bytes"
@@ -38,7 +38,7 @@ func Test_compressRepetition(t *testing.T) {
 		in := []byte{0, 1, 1, 1, 0, 2, 2, 0, 3, 3, 0}
 		block := compress(in, 1)
 
-		rec := reconstruct(block)
+		rec := decompress(block)
 
 		if len(rec) != len(in) {
 			t.Fatal("failed reconstruct size")
@@ -56,8 +56,7 @@ func Test_compressRepetition(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to read file: %s", err)
 		}
-		block := compress(in, 10)
-
+		block := compress(in, 6)
 		serialized := block.serialize()
 
 		if len(serialized) > len(in) {
@@ -68,7 +67,7 @@ func Test_compressRepetition(t *testing.T) {
 		// 	t.Errorf("compressed size %d should be smaller than original %d", len(in), compressedSize)
 		// }
 		// t.Logf("original: %d compressed: %d ratio: %.2f", len(in), compressedSize, float64(compressedSize)/float64(len(in)))
-		rec := reconstruct(block)
+		rec := decompress(block)
 		if len(rec) != len(in) {
 			t.Error("invalid reconstruction size")
 		}
@@ -82,15 +81,18 @@ func Test_compressRepetition(t *testing.T) {
 
 func Test_serializeParse(t *testing.T) {
 	t.Run("should return to same state", func(t *testing.T) {
-		in, err := os.ReadFile("/bin/zsh")
-		if err != nil {
-			t.Fatalf("failed to read file: %s", err)
-		}
-		block := compress(in, 12)
+		in := []byte{1, 1, 0, 1, 1, 2, 2, 0, 3, 3, 0}
+		block := compress(in, 2)
 		serialize := block.serialize()
 		ratio := float64(len(serialize)) / float64(len(in))
 		if ratio > 1 {
 			t.Errorf("compression increased file size. ratio: %.2f", ratio)
+		}
+		out := decompress(block)
+		for i := range out {
+			if out[i] != in[i] {
+				t.Fatalf("invalid reconstruction at pos %d expected %d got %d", i, in[i], out[i])
+			}
 		}
 		resp, err := parse(serialize)
 		if err != nil {
