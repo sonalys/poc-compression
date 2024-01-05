@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"sort"
 )
 
 type (
@@ -22,7 +23,7 @@ type (
 	block struct {
 		size   uint32
 		parsed bool
-		head   *segment
+		head   []orderedSegment
 	}
 
 	// segment
@@ -41,7 +42,67 @@ type (
 		// no need to serialize these fields on disk.
 		previous, next *segment
 	}
+
+	orderedSegment struct {
+		*segment
+		order []uint8
+	}
 )
+
+// returns how many bytes this section is compressing.
+func (s *segment) getCompressionGains() int {
+	var compressedSize int = 6 // meta + bufLen + 1 byte repeat
+	if s.flags.isRepeat2Bytes() {
+		compressedSize += 1 // +1 byte repeat
+	}
+	compressedSize += int(s.flags.getPosLen()) // 1 byte per order
+	compressedSize += int(len(s.buffer))
+	originalSize := int(len(s.buffer)) * int(s.repeat) * int(len(s.pos))
+	return originalSize - compressedSize
+}
+
+func getOrderedSegments(s *segment) []orderedSegment {
+	// segmentProjection is a projection abstraction to convert uint32 system coordinate to uint8.
+	// we can run this optimization because we don't care about segment position in final buffer,
+	// we only care about in which order they are decompressed.
+	type segmentProjection struct {
+		pos     uint32
+		order   uint8
+		segment *orderedSegment
+	}
+	var list []segmentProjection
+	cur := s
+	for {
+		curSegment := &orderedSegment{
+			segment: cur,
+		}
+		for _, pos := range cur.pos {
+			list = append(list, segmentProjection{
+				pos:     pos,
+				segment: curSegment,
+			})
+		}
+		if cur.next == nil {
+			break
+		}
+		cur = cur.next
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].pos < list[j].pos
+	})
+
+	for i := 1; i < len(list); i++ {
+		list[i].order = list[i-1].order + uint8(1)
+	}
+	orderedSegmentList := make([]orderedSegment, 0, len(list))
+	for _, entry := range list {
+		entry.segment.order = append(entry.segment.order, entry.order)
+	}
+	for _, entry := range list {
+		orderedSegmentList = append(orderedSegmentList, *entry.segment)
+	}
+	return orderedSegmentList
+}
 
 const (
 	typeUncompressed segType = 0b0
@@ -80,23 +141,19 @@ func (m meta) setIsRepeat2Bytes(value bool) meta {
 	return m &^ flagRepeatIs2Bytes
 }
 
-func newSegment(t segType, pos uint32, repeat uint16, buffer []byte) *segment {
+func newSegment(t segType, pos uint32, repeat uint16, buffer []byte) (*segment, int) {
 	flags := meta(0)
 	flags = flags.setIsRepeat2Bytes(repeat > math.MaxUint8)
 	flags = flags.setPosLen(1)
 	flags = flags.setType(t)
-	return &segment{
+	resp := &segment{
 		flags:  flags,
 		repeat: repeat,
 		buffer: buffer,
 		pos:    []uint32{pos},
 	}
-}
-
-func (s *segment) addNext(t segType, pos uint32, repeat uint16, buffer []byte) *segment {
-	s.next = newSegment(t, pos, repeat, buffer)
-	s.next.previous = s
-	return s.next
+	gains := resp.getCompressionGains()
+	return resp, gains
 }
 
 func (s *segment) addPos(pos []uint32) (*segment, error) {
@@ -108,6 +165,12 @@ func (s *segment) addPos(pos []uint32) (*segment, error) {
 	s.flags = s.flags.setPosLen(uint8(newLen))
 	s.pos = append(s.pos, pos...)
 	return s, nil
+}
+
+func (s *segment) add(next *segment) *segment {
+	s.next = next
+	next.previous = s
+	return next
 }
 
 // deduplicate repetition groups of same size and same buffer.

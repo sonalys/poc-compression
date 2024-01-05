@@ -1,17 +1,17 @@
 package gompressor
 
-func compress(in []byte, minSize uint16) block {
+func compress(in []byte, minSize uint16) *block {
 	if minSize == 1 {
 		panic("don't be retarded")
 	}
 	b := block{
 		size: uint32(len(in)),
-		head: &segment{},
 	}
 	// prev is a cursor to the last position before a repeating group
 	var prev uint32
+	head := &segment{}
 	// cur is a cursor to the head of the block's segments.
-	cur := b.head
+	cur := head
 	// finds repetition groups and store them.
 	for index := uint32(0); index < uint32(len(in)); index++ {
 		repeatCount := uint16(1)
@@ -22,25 +22,37 @@ func compress(in []byte, minSize uint16) block {
 			}
 		}
 		if repeatCount >= minSize {
+			compressed, gain := newSegment(typeRepeat, index, repeatCount, []byte{in[index]})
+			if gain < 0 {
+				continue
+			}
 			// avoid creating segments with nil buffer.
 			if index-prev > 0 {
-				cur = cur.addNext(typeUncompressed, prev, 1, in[prev:index])
+				raw, gain2 := newSegment(typeUncompressed, prev, 1, in[prev:index])
+				if gain+gain2 < 0 {
+					continue
+				}
+				cur = cur.add(raw)
 			}
-			cur = cur.addNext(typeRepeat, index, repeatCount, []byte{in[index]})
+			cur = cur.add(compressed)
 			// mark the next byte as the begin of the next unsegmented section.
 			prev = index + uint32(repeatCount)
 			// prev -1 because the for iterator will add +1 again.
 			index += prev - 1
 		}
 	}
-	b.head = b.head.next
-	if b.head == nil {
-		b.head = newSegment(typeUncompressed, 0, 1, in)
+	head = head.next
+	if head == nil {
+		head, _ = newSegment(typeUncompressed, 0, 1, in)
 	} else if uint32(len(in))-prev > 0 {
-		cur.addNext(typeUncompressed, prev, 1, in[prev:])
+		raw, _ := newSegment(typeUncompressed, prev, 1, in[prev:])
+		cur.next = raw
+		raw.previous = cur
 	}
 
-	b.head.deduplicate()
+	head.deduplicate()
+
+	b.head = getOrderedSegments(head)
 
 	// for i := uint32(0); i < uint32(len(out)); i++ {
 	// 	localGroups := []repetitionGroup{}
@@ -87,5 +99,5 @@ func compress(in []byte, minSize uint16) block {
 	// 	groups = append(groups, localGroups...)
 	// }
 	// out = out2
-	return b
+	return &b
 }

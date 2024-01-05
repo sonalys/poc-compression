@@ -20,51 +20,32 @@ import (
 // 	return out
 // }
 
+func getOrderedDecompressionList(list []orderedSegment) (out []orderedSegment) {
+	out = make([]orderedSegment, 0, len(list))
+	var order uint8 = 0
+	for {
+		found := false
+		for _, entry := range list {
+			for _, curOrder := range entry.order {
+				if curOrder == order {
+					out = append(out, entry)
+					found = true
+					order++
+				}
+			}
+		}
+		if !found {
+			return
+		}
+	}
+}
+
 // decompress2 is my attempt to make buffer decompression linear, so we can avoid storing position for segments with only 1 position.
 // for this to work I need the iterator to fill the buffer from beginning to end, without utilizing the cur.pos[0].
-func decompress(in block) []byte {
+func decompress(in *block) []byte {
 	out := make([]byte, 0, in.size)
-	// first iteration, we fill all first positions to the out buffer without relying on the cur.pos variable.
-	cur := in.head
-	for {
-		from := bytes.Repeat(cur.buffer, int(cur.repeat))
-		cur.pos = cur.pos[1:]
-		out = append(out, from...)
-		if cur.next == nil {
-			break
-		}
-		cur = cur.next
-	}
-	// from the second iteration next, we start using cur.pos to append data, however we need to right-shift the data.
-	cur = in.head
-	for {
-		buf := bytes.Repeat(cur.buffer, int(cur.repeat))
-		bufLen := uint32(len(buf))
-		for _, pos := range cur.pos {
-			// we only fill positions that are already addressable in the expanding buffer.
-			if pos >= uint32(len(out)) {
-				break
-			}
-			shift := pos + bufLen
-			outLen := uint32(len(out))
-			temp := make([]byte, outLen+bufLen)
-			copy(temp, out)
-			out = temp
-			copy(out[shift:], out[pos:])
-			copy(out[pos:], buf)
-		}
-		// fmt.Printf("%d %d\n", len(out), in.size)
-
-		// loop until we fill the whole decompressed buffer
-		if uint32(len(out)) == in.size {
-			break
-		} else if uint32(len(out)) > in.size {
-			panic("memory leak")
-		}
-		if cur.next == nil {
-			cur = in.head
-		}
-		cur = cur.next
+	for _, entry := range getOrderedDecompressionList(in.head) {
+		out = append(out, bytes.Repeat(entry.buffer, int(entry.repeat))...)
 	}
 	return out
 }
