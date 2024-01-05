@@ -125,7 +125,7 @@ func Test_bestMinSize(t *testing.T) {
 	}
 	var bestSize uint32 = math.MaxUint32
 	bestGroupSize := -1
-	for groupSize := 2; groupSize < 20; groupSize++ {
+	for groupSize := 2; groupSize < 30; groupSize++ {
 		block := compress(in, uint16(groupSize))
 		serialize := block.serialize()
 		if newSize := uint32(len(serialize)); newSize < bestSize {

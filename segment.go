@@ -20,8 +20,9 @@ type (
 	// My cats are still trying to reach to me about how to increase segments efficiency in disk, so stay tuned.
 
 	block struct {
-		size uint32
-		head *segment
+		size   uint32
+		parsed bool
+		head   *segment
 	}
 
 	// segment

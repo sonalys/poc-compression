@@ -4,12 +4,17 @@ import "encoding/binary"
 
 var encoder = binary.BigEndian
 
-func (cur segment) serialize(i uint32) []byte {
+func (cur segment) serialize(parsed bool) []byte {
 	bufLen := uint32(len(cur.buffer))
 	posLen := uint32(len(cur.pos))
 
 	buffer := make([]byte, 0, 7+bufLen+4*posLen)
 
+	// we don't need to store the first position, since our decompression logic doesn't use it.
+	if !parsed {
+		cur.pos = cur.pos[1:]
+		cur.flags = cur.flags.setPosLen(uint8(len(cur.pos)))
+	}
 	buffer = append(buffer, byte(cur.flags))
 	buffer = encoder.AppendUint32(buffer, bufLen)
 	if cur.flags.getType() == typeRepeat {
@@ -19,6 +24,7 @@ func (cur segment) serialize(i uint32) []byte {
 			buffer = append(buffer, byte(cur.repeat))
 		}
 	}
+	// we don't need to store the first position, since our decompression logic doesn't use it.
 	for i := range cur.pos {
 		buffer = encoder.AppendUint32(buffer, cur.pos[i])
 	}
@@ -34,7 +40,7 @@ func (b block) serialize() []byte {
 	cur := b.head
 	var i uint32
 	for {
-		buffer = append(buffer, cur.serialize(i)...)
+		buffer = append(buffer, cur.serialize(b.parsed)...)
 		if cur.next == nil {
 			break
 		}
@@ -76,6 +82,7 @@ func parseSegment(b []byte, i uint32) (segment, uint32) {
 
 func parse(b []byte) (out block, err error) {
 	var pos uint32
+	out.parsed = true
 	out.size = decoder.Uint32(b[0:])
 	pos += 4
 	out.head = &segment{}

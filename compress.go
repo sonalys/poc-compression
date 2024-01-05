@@ -1,6 +1,9 @@
 package gompressor
 
 func compress(in []byte, minSize uint16) block {
+	if minSize == 1 {
+		panic("don't be retarded")
+	}
 	b := block{
 		size: uint32(len(in)),
 		head: &segment{},
