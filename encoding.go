@@ -5,15 +5,13 @@ import "encoding/binary"
 var encoder = binary.BigEndian
 var decoder = binary.BigEndian
 
-func (cur orderedSegment) encodeSegment(parsed bool) []byte {
+func (cur orderedSegment) encodeSegment() []byte {
 	bufLen := uint32(len(cur.buffer))
-	// we can cut off the first order, since we already store it in order.
-	cur.order = cur.order[1:]
 	// allocate buffers.
 	orderLen := uint8(len(cur.order))
+	cur.flags = cur.flags.setPosLen(orderLen)
 	buffer := make([]byte, 0, 7+bufLen+uint32(orderLen))
 	// start storing the binary.
-	cur.flags = cur.flags.setPosLen(orderLen)
 	buffer = append(buffer, byte(cur.flags))
 	buffer = encoder.AppendUint32(buffer, bufLen)
 	if cur.flags.getType() == typeRepeat {
@@ -31,15 +29,16 @@ func (cur orderedSegment) encodeSegment(parsed bool) []byte {
 	return buffer
 }
 
-func decodeSegment(b []byte, index uint8) (orderedSegment, uint32) {
+func decodeSegment(b []byte) (orderedSegment, uint32) {
 	var pos uint32
 	flag := meta(b[pos])
 	pos += 1
 	cur := orderedSegment{
-		segment: &segment{},
-		order:   make([]byte, flag.getPosLen()+1),
+		segment: &segment{
+			flags: flag,
+		},
+		order: make([]byte, flag.getPosLen()),
 	}
-	cur.order[0] = index
 	bufLen := decoder.Uint32(b[pos:])
 	pos += 4
 	cur.buffer = make([]byte, bufLen)
@@ -52,7 +51,7 @@ func decodeSegment(b []byte, index uint8) (orderedSegment, uint32) {
 			pos += 1
 		}
 	}
-	for i := 1; i < len(cur.order); i++ {
+	for i := range cur.order {
 		cur.order[i] = b[pos]
 		pos += 1
 	}
@@ -66,7 +65,7 @@ func encode(b *block) []byte {
 	buffer = encoder.AppendUint32(buffer, b.size)
 	// Iterate from head to tail of segments.
 	for _, entry := range b.head {
-		buffer = append(buffer, entry.encodeSegment(b.parsed)...)
+		buffer = append(buffer, entry.encodeSegment()...)
 	}
 	return buffer
 }
@@ -84,7 +83,7 @@ func decode(b []byte) (out *block, err error) {
 		if pos == uint32(len(b)) {
 			break
 		}
-		cur, offset := decodeSegment(b[pos:], i)
+		cur, offset := decodeSegment(b[pos:])
 		out.head = append(out.head, cur)
 		pos += offset
 		i++

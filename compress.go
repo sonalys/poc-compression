@@ -4,8 +4,9 @@ func compress(in []byte, minSize uint16) *block {
 	if minSize == 1 {
 		panic("don't be retarded")
 	}
+	lenIn := uint32(len(in))
 	b := block{
-		size: uint32(len(in)),
+		size: lenIn,
 	}
 	// prev is a cursor to the last position before a repeating group
 	var prev uint32
@@ -13,25 +14,19 @@ func compress(in []byte, minSize uint16) *block {
 	// cur is a cursor to the head of the block's segments.
 	cur := head
 	// finds repetition groups and store them.
-	for index := uint32(0); index < uint32(len(in)); index++ {
+	for index := uint32(0); index < lenIn; index++ {
 		repeatCount := uint16(1)
-		for j := index + 1; j < uint32(len(in)) && in[index] == in[j]; j++ {
+		for j := index + 1; j < lenIn && in[index] == in[j]; j++ {
 			repeatCount += 1
 			if repeatCount == 0 {
 				panic("repeat overflow")
 			}
 		}
 		if repeatCount >= minSize {
-			compressed, gain := newSegment(typeRepeat, index, repeatCount, []byte{in[index]})
-			if gain < 0 {
-				continue
-			}
+			compressed := newSegment(typeRepeat, index, repeatCount, []byte{in[index]})
 			// avoid creating segments with nil buffer.
 			if index-prev > 0 {
-				raw, gain2 := newSegment(typeUncompressed, prev, 1, in[prev:index])
-				if gain+gain2 < 0 {
-					continue
-				}
+				raw := newSegment(typeUncompressed, prev, 1, in[prev:index])
 				cur = cur.add(raw)
 			}
 			cur = cur.add(compressed)
@@ -43,14 +38,15 @@ func compress(in []byte, minSize uint16) *block {
 	}
 	head = head.next
 	if head == nil {
-		head, _ = newSegment(typeUncompressed, 0, 1, in)
-	} else if uint32(len(in))-prev > 0 {
-		raw, _ := newSegment(typeUncompressed, prev, 1, in[prev:])
+		head = newSegment(typeUncompressed, 0, 1, in)
+	} else if lenIn-prev > 0 {
+		raw := newSegment(typeUncompressed, prev, 1, in[prev:])
 		cur.next = raw
 		raw.previous = cur
 	}
 
 	head.deduplicate()
+	// head.optimize()
 
 	b.head = getOrderedSegments(head)
 
