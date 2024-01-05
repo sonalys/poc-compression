@@ -11,30 +11,28 @@ func compress(in []byte, minSize uint16) block {
 	cur := b.head
 	// finds repetition groups and store them.
 	for index := uint32(0); index < uint32(len(in)); index++ {
-		size := uint16(1)
+		repeatCount := uint16(1)
 		for j := index + 1; j < uint32(len(in)) && in[index] == in[j]; j++ {
-			size++
+			repeatCount += 1
+			if repeatCount == 0 {
+				panic("repeat overflow")
+			}
 		}
-		if size >= minSize {
+		if repeatCount >= minSize {
 			// avoid creating segments with nil buffer.
 			if index-prev > 0 {
 				cur = cur.addNext(typeUncompressed, prev, 1, in[prev:index])
 			}
-			cur = cur.addNext(typeRepeat, index, size, []byte{in[index]})
-			index += uint32(size) - 1
+			cur = cur.addNext(typeRepeat, index, repeatCount, []byte{in[index]})
+			index += uint32(repeatCount) - 1
 			prev = index
 		}
 	}
 	b.head = b.head.next
 	if b.head == nil {
 		b.head = newSegment(typeUncompressed, 0, 1, in)
-	}
-	// append last segment of non-repeting characters.
-	cur.next = &segment{
-		pos:      []uint32{prev},
-		buffer:   in[prev:],
-		repeat:   1,
-		previous: cur,
+	} else {
+		cur.addNext(typeUncompressed, prev, 1, in[prev:])
 	}
 
 	b.head.deduplicate()

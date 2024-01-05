@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"math"
 	"os"
 	"slices"
 	"testing"
@@ -80,28 +81,59 @@ func Test_compressRepetition(t *testing.T) {
 }
 
 func Test_serializeParse(t *testing.T) {
-	t.Run("should return to same state", func(t *testing.T) {
-		in := []byte{1, 1, 0, 1, 1, 2, 2, 0, 3, 3, 0}
-		block := compress(in, 2)
-		serialize := block.serialize()
-		ratio := float64(len(serialize)) / float64(len(in))
-		if ratio > 1 {
-			t.Errorf("compression increased file size. ratio: %.2f", ratio)
-		}
-		out := decompress(block)
-		for i := range out {
-			if out[i] != in[i] {
-				t.Fatalf("invalid reconstruction at pos %d expected %d got %d", i, in[i], out[i])
-			}
-		}
+	in, err := os.ReadFile("/bin/zsh")
+	if err != nil {
+		t.Fatalf("failed to read file: %s", err)
+	}
+
+	block := compress(in, 7)
+	serialize := block.serialize()
+
+	t.Run("serialization", func(t *testing.T) {
 		resp, err := parse(serialize)
 		if err != nil {
 			t.Fatalf("failed to parse serialize: %s", err)
 		}
-		serialize2 := resp.serialize()
-
-		if !bytes.Equal(serialize, serialize2) {
-			t.Fatal("buffer is variating in serialization")
+		got := resp.serialize()
+		if !bytes.Equal(serialize, got) {
+			t.Fatalf("buffer is variating in serialization.\nexp:\n%v\ngot\n%v", serialize, got)
 		}
 	})
+
+	t.Run("compression rate", func(t *testing.T) {
+		ratio := float64(len(serialize)) / float64(len(in))
+		if ratio > 1 {
+			t.Errorf("compression increased file size. ratio: %.2f", ratio)
+		}
+	})
+
+	t.Run("reconstruction", func(t *testing.T) {
+		out := decompress(block)
+		for i := range out {
+			if out[i] != in[i] {
+				t.Logf("exp:\n%v\ngot:\n%v", in[i-10:i+10], out[i-10:i+10])
+				t.Fatalf("invalid reconstruction at pos %d expected %d got %d", i, in[i], out[i])
+			}
+		}
+	})
+}
+
+func Test_bestMinSize(t *testing.T) {
+	in, err := os.ReadFile("/bin/zsh")
+	if err != nil {
+		t.Fatalf("failed to read file: %s", err)
+	}
+	var bestSize uint32 = math.MaxUint32
+	bestGroupSize := -1
+	for groupSize := 2; groupSize < 20; groupSize++ {
+		block := compress(in, uint16(groupSize))
+		serialize := block.serialize()
+		if newSize := uint32(len(serialize)); newSize < bestSize {
+			bestSize = newSize
+			bestGroupSize = groupSize
+		}
+	}
+	ratio := float64(bestSize) / float64(len(in))
+	t.Logf("best size %d group size %d. ratio %.2f", bestSize, bestGroupSize, ratio)
+	t.Fail()
 }

@@ -1,7 +1,8 @@
 package gompressor
 
 import (
-	"encoding/binary"
+	"bytes"
+	"fmt"
 	"math"
 )
 
@@ -30,7 +31,7 @@ type (
 		flags meta
 		// pos indicates where the buffer is repeating in the file, it can repeat identically in many places.
 		// we can have at max 32 positions per segment.
-		pos []uint32
+		pos []uint32 // todo: no need to hold pos if there is only 1 value.
 		// repeat indicates how many times buffer is repeated. that's not the same as pos.
 		// we are only storing this field in disk if the segment type is typeRepeat.
 		repeat uint16
@@ -52,7 +53,7 @@ const (
 // 1. clears the last 5 bytes
 // 2. left shift value 3 bytes
 // 3. set value of posLen.
-func (m meta) setPosLen(size byte) meta {
+func (m meta) setPosLen(size uint8) meta {
 	return m&0b111 | (meta(size) << 3)
 }
 
@@ -70,13 +71,17 @@ func (m meta) setType(t segType) meta { return (m & 0b11111100) | meta(t) }
 // shift right 1 byte to get segType
 func (m meta) getType() segType { return segType(m & 0b11) }
 
-func (m meta) IsRepeat2Bytes() bool { return m&flagRepeatIs2Bytes != 0 }
+func (m meta) isRepeat2Bytes() bool { return m&flagRepeatIs2Bytes != 0 }
+func (m meta) setIsRepeat2Bytes(value bool) meta {
+	if value {
+		return m | flagRepeatIs2Bytes
+	}
+	return m &^ flagRepeatIs2Bytes
+}
 
 func newSegment(t segType, pos uint32, repeat uint16, buffer []byte) *segment {
 	flags := meta(0)
-	if repeat > math.MaxUint8 {
-		flags = flags | flagRepeatIs2Bytes
-	}
+	flags = flags.setIsRepeat2Bytes(repeat > math.MaxUint8)
 	flags = flags.setPosLen(1)
 	flags = flags.setType(t)
 	return &segment{
@@ -93,74 +98,37 @@ func (s *segment) addNext(t segType, pos uint32, repeat uint16, buffer []byte) *
 	return s.next
 }
 
-func (s *segment) addPos(pos []uint32) *segment {
-	newLen := s.flags.getPosLen() + byte(len(pos))
-	if len(pos) > 31 {
+func (s *segment) addPos(pos []uint32) (*segment, error) {
+	newLen := len(s.pos) + len(pos)
+	if newLen > 0b11111 {
 		// TODO: add better handling for repeating groups.
-		panic("len(pos) overflow")
+		return s, fmt.Errorf("len(pos) overflow")
 	}
-	s.flags = s.flags.setPosLen(newLen)
+	s.flags = s.flags.setPosLen(uint8(newLen))
 	s.pos = append(s.pos, pos...)
-	return s
-}
-
-var encoder = binary.BigEndian
-
-func (cur segment) serialize(i uint32) []byte {
-	buffer := make([]byte, 0, len(cur.buffer))
-	buffer = append(buffer, byte(cur.flags))
-	buffer = encoder.AppendUint32(buffer, uint32(len(cur.buffer)))
-	if cur.flags.IsRepeat2Bytes() {
-		buffer = encoder.AppendUint16(buffer, cur.repeat)
-	} else {
-		buffer = append(buffer, byte(cur.repeat))
-	}
-	for i := range cur.pos {
-		buffer = encoder.AppendUint32(buffer, cur.pos[i])
-	}
-	buffer = append(buffer, cur.buffer...)
-	return buffer
-}
-
-func (b *block) serialize() []byte {
-	buffer := make([]byte, 0, b.size)
-	// Store original size of the buffer.
-	buffer = encoder.AppendUint32(buffer, b.size)
-	// Iterate from head to tail of segments.
-	cur := b.head
-	var i uint32
-	for {
-		buffer = append(buffer, cur.serialize(i)...)
-		if cur.next == nil {
-			break
-		}
-		cur = cur.next
-		i++
-	}
-	return buffer
+	return s, nil
 }
 
 // deduplicate repetition groups of same size and same buffer.
 func (b *segment) deduplicate() {
-	segI := b
+	current := b
 	for {
-		segJ := segI
+		iter := current
 		for {
-			segJ = segJ.next
-			if segJ == nil {
+			if iter = iter.next; iter == nil {
 				break
 			}
-			if segI.flags.getType() != segJ.flags.getType() || // check segment type for merging.
-				segI.buffer[0] == segJ.buffer[0] || // check if the repeated char is the same.
-				segI.repeat != segJ.repeat { // check if repeat is the same amount.
+			if !bytes.Equal(current.buffer, iter.buffer) || current.repeat != iter.repeat || current.flags.getType() != iter.flags.getType() {
 				continue
 			}
-			segI.addPos(segJ.pos)
-			segJ.previous.next = segJ.next // delete this element
+			// if pos doesn't overflow, we continue with the merge operation.
+			if _, err := current.addPos(iter.pos); err == nil {
+				iter.previous.next = iter.next
+			}
 		}
-		if segI.next == nil {
+		if current.next == nil {
 			break
 		}
-		segI = segI.next
+		current = current.next
 	}
 }
