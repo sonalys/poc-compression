@@ -24,14 +24,16 @@ func compress(in []byte, minSize uint16) block {
 				cur = cur.addNext(typeUncompressed, prev, 1, in[prev:index])
 			}
 			cur = cur.addNext(typeRepeat, index, repeatCount, []byte{in[index]})
-			index += uint32(repeatCount) - 1
-			prev = index
+			// mark the next byte as the begin of the next unsegmented section.
+			prev = index + uint32(repeatCount)
+			// prev -1 because the for iterator will add +1 again.
+			index += prev - 1
 		}
 	}
 	b.head = b.head.next
 	if b.head == nil {
 		b.head = newSegment(typeUncompressed, 0, 1, in)
-	} else {
+	} else if uint32(len(in))-prev > 0 {
 		cur.addNext(typeUncompressed, prev, 1, in[prev:])
 	}
 

@@ -36,8 +36,8 @@ func Test_RandomFile(t *testing.T) {
 
 func Test_compressRepetition(t *testing.T) {
 	t.Run("small sequences", func(t *testing.T) {
-		in := []byte{0, 1, 1, 1, 0, 2, 2, 0, 3, 3, 0}
-		block := compress(in, 1)
+		in := []byte{0, 1, 1, 2, 2, 1, 1, 2, 2, 3}
+		block := compress(in, 2)
 
 		rec := decompress(block)
 
