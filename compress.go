@@ -2,7 +2,7 @@ package gompressor
 
 func compress(in []byte, minSize uint16) *block {
 	if minSize == 1 {
-		panic("don't be retarded")
+		panic("minSize should be greater than 1")
 	}
 	lenIn := uint32(len(in))
 	b := block{
