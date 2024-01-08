@@ -64,20 +64,20 @@ func Test_encoding(t *testing.T) {
 		}
 
 		got := [][]byte{}
-		for i := range block.head {
-			got = append(got, block.head[i].buffer)
+		for i := range block.segments {
+			got = append(got, block.segments[i].buffer)
 		}
 		require.Equal(t, exp, got)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
-		require.Equal(t, len(block.head), len(decoded.head))
-		for i := range block.head {
-			cur := block.head[i]
+		require.Equal(t, len(block.segments), len(decoded.segments))
+		for i := range block.segments {
+			cur := block.segments[i]
 			cur.next = nil
 			cur.previous = nil
 			cur.pos = nil
-			require.Equal(t, block.head[i], decoded.head[i], "segment %d is different", i)
+			require.Equal(t, block.segments[i], decoded.segments[i], "segment %d is different", i)
 		}
 	})
 
@@ -116,9 +116,9 @@ func Test_bestMinSize(t *testing.T) {
 	block := Compress(in)
 	serialize := encode(block)
 	newSize := int64(len(serialize))
-	segmentCount = len(block.head)
+	segmentCount = len(block.segments)
 
-	for _, entry := range block.head {
+	for _, entry := range block.segments {
 		if entry.repeat > uint16(highestRepeat) {
 			highestRepeat = int(entry.repeat)
 		}

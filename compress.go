@@ -40,7 +40,7 @@ func Compress(in []byte) *block {
 	head.Deduplicate()
 	head.Optimize()
 
-	b.head = GetOrderedSegments(head)
+	b.segments = GetOrderedSegments(head)
 
 	// for i := uint32(0); i < uint32(len(out)); i++ {
 	// 	localGroups := []repetitionGroup{}

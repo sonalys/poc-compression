@@ -5,7 +5,7 @@ import "encoding/binary"
 var encoder = binary.BigEndian
 var decoder = binary.BigEndian
 
-func (cur orderedSegment) encodeSegment() []byte {
+func (cur diskSegment) encodeSegment() []byte {
 	bufLen := uint32(len(cur.buffer))
 	// allocate buffers.
 	orderLen := uint8(len(cur.order))
@@ -29,11 +29,11 @@ func (cur orderedSegment) encodeSegment() []byte {
 	return buffer
 }
 
-func decodeSegment(b []byte) (orderedSegment, uint32) {
+func decodeSegment(b []byte) (diskSegment, uint32) {
 	var pos uint32
 	flag := meta(b[pos])
 	pos += 1
-	cur := orderedSegment{
+	cur := diskSegment{
 		segment: &segment{
 			flags:  flag,
 			repeat: 1,
@@ -65,7 +65,7 @@ func encode(b *block) []byte {
 	// Store original size of the buffer.
 	buffer = encoder.AppendUint32(buffer, b.size)
 	// Iterate from head to tail of segments.
-	for _, entry := range b.head {
+	for _, entry := range b.segments {
 		buffer = append(buffer, entry.encodeSegment()...)
 	}
 	return buffer
@@ -74,8 +74,8 @@ func encode(b *block) []byte {
 func decode(b []byte) (out *block, err error) {
 	var pos uint32
 	out = &block{
-		size: decoder.Uint32(b[0:]),
-		head: make([]orderedSegment, 0),
+		size:     decoder.Uint32(b[0:]),
+		segments: make([]diskSegment, 0),
 	}
 	pos += 4
 	var i uint8
@@ -84,7 +84,7 @@ func decode(b []byte) (out *block, err error) {
 			break
 		}
 		cur, offset := decodeSegment(b[pos:])
-		out.head = append(out.head, cur)
+		out.segments = append(out.segments, cur)
 		pos += offset
 		i++
 		if i == 0 {

@@ -8,7 +8,7 @@ import (
 
 func Test_Encoding(t *testing.T) {
 	t.Run("uncompressed segment", func(t *testing.T) {
-		segment := orderedSegment{
+		segment := diskSegment{
 			segment: &segment{
 				flags:  meta(typeUncompressed),
 				repeat: 1,
@@ -27,7 +27,7 @@ func Test_Encoding(t *testing.T) {
 	})
 
 	t.Run("repeat segment", func(t *testing.T) {
-		segment := orderedSegment{
+		segment := diskSegment{
 			segment: &segment{
 				flags:  meta(typeRepeat),
 				repeat: 2,

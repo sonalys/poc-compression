@@ -1,11 +1,7 @@
 package gompressor
 
-import (
-	"bytes"
-)
-
-func getOrderedDecompressionList(list []orderedSegment) (out []orderedSegment) {
-	out = make([]orderedSegment, 0, len(list))
+func getOrderedDecompressionList(list []diskSegment) (out []diskSegment) {
+	out = make([]diskSegment, 0, len(list))
 	var order uint8 = 0
 	for {
 		found := false
@@ -26,8 +22,8 @@ func getOrderedDecompressionList(list []orderedSegment) (out []orderedSegment) {
 
 func Decompress(in *block) []byte {
 	out := make([]byte, 0, in.size)
-	for _, entry := range getOrderedDecompressionList(in.head) {
-		out = append(out, bytes.Repeat(entry.buffer, int(entry.repeat))...)
+	for _, entry := range getOrderedDecompressionList(in.segments) {
+		out = append(out, entry.Decompress()...)
 	}
 	return out
 }

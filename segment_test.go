@@ -8,7 +8,7 @@ import (
 
 func Test_GetCompressionGain(t *testing.T) {
 	t.Run("positive gain", func(t *testing.T) {
-		seg := &orderedSegment{
+		seg := &diskSegment{
 			order: []uint8{0, 1},
 			segment: &segment{
 				flags:  meta(typeRepeat),
@@ -27,7 +27,7 @@ func Test_GetCompressionGain(t *testing.T) {
 	})
 
 	t.Run("negative gain", func(t *testing.T) {
-		seg := &orderedSegment{
+		seg := &diskSegment{
 			order: []uint8{0, 1},
 			segment: &segment{
 				flags:  meta(typeUncompressed),

@@ -11,8 +11,8 @@ type (
 	// My cats are still trying to reach to me about how to increase segments efficiency in disk, so stay tuned.
 
 	block struct {
-		size uint32
-		head []orderedSegment
+		size     uint32
+		segments []diskSegment
 	}
 
 	// segment
@@ -34,7 +34,7 @@ type (
 		pos []uint32 // todo: no need to hold pos if there is only 1 value.
 	}
 
-	orderedSegment struct {
+	diskSegment struct {
 		*segment
 
 		// order represents in which order this segment should be executed on decode.
@@ -43,6 +43,17 @@ type (
 		order []uint8
 	}
 )
+
+func (s *segment) Decompress() []byte {
+	switch s.flags.getType() {
+	case typeUncompressed:
+		return s.buffer
+	case typeRepeat:
+		return bytes.Repeat(s.buffer, int(s.repeat))
+	default:
+		panic("invalid segment type")
+	}
+}
 
 // GetCompressionGains returns how many bytes this section is compressing.
 func (s *segment) GetCompressionGains() int64 {
@@ -72,20 +83,20 @@ func (s *segment) GetCompressionGains() int64 {
 
 // GetOrderedSegments will convert a Segment into an OrderedSegment,
 // we do this to map pos, which occupies 4 bytes, to order, which is uses 1 byte.
-func GetOrderedSegments(s *segment) []orderedSegment {
+func GetOrderedSegments(s *segment) []diskSegment {
 	// segmentProjection is a projection abstraction to convert uint32 system coordinate to uint8.
 	// we can run this optimization because we don't care about segment position in final buffer,
 	// we only care about in which order they are decompressed.
 	type segmentProjection struct {
 		pos     uint32
 		order   uint8
-		segment *orderedSegment
+		segment *diskSegment
 	}
 	var projections []segmentProjection
-	var segList []*orderedSegment
+	var segList []*diskSegment
 	cur := s
 	for {
-		curSegment := &orderedSegment{
+		curSegment := &diskSegment{
 			segment: cur,
 		}
 		segList = append(segList, curSegment)
@@ -105,14 +116,18 @@ func GetOrderedSegments(s *segment) []orderedSegment {
 	})
 	// add a crescent order for all segments. example: 0,1,2,3.
 	for i := 1; i < len(projections); i++ {
-		projections[i].order = projections[i-1].order + uint8(1)
+		order := projections[i-1].order + 1
+		if order == 0 {
+			panic("segment count overflow")
+		}
+		projections[i].order = order
 	}
 	// all projections link to their respective segments, so the same segment can have many projections.
 	for _, entry := range projections {
 		entry.segment.order = append(entry.segment.order, entry.order)
 	}
 	// here we are simply converting the projection back to an orderedSegment.
-	finalList := make([]orderedSegment, 0, len(segList))
+	finalList := make([]diskSegment, 0, len(segList))
 	for i := range segList {
 		finalList = append(finalList, *segList[i])
 	}
