@@ -22,19 +22,19 @@ func compress(in []byte, minSize uint16) *block {
 				panic("repeat overflow")
 			}
 		}
-		if repeatCount >= minSize {
-			compressed := newSegment(typeRepeat, index, repeatCount, []byte{in[index]})
-			// avoid creating segments with nil buffer.
-			if index-prev > 0 {
-				raw := newSegment(typeUncompressed, prev, 1, in[prev:index])
-				cur = cur.add(raw)
-			}
-			cur = cur.add(compressed)
-			// mark the next byte as the begin of the next unsegmented section.
-			prev = index + uint32(repeatCount)
-			// prev -1 because the for iterator will add +1 again.
-			index += prev - 1
+		// TODO: make byte gain calculation optimal so we don't need variable minSize, always 2.
+		if repeatCount < minSize {
+			continue
 		}
+		// avoid creating segments with nil buffer.
+		if index-prev > 0 {
+			cur = cur.add(newSegment(typeUncompressed, prev, 1, in[prev:index]))
+		}
+		cur = cur.add(newSegment(typeRepeat, index, repeatCount, []byte{in[index]}))
+		// prev -1 because the for iterator will add +1 again.
+		index += uint32(repeatCount) - 1
+		// mark the next byte as the begin of the next unsegmented section.
+		prev = index
 	}
 	head = head.next
 	if head == nil {

@@ -35,7 +35,8 @@ func decodeSegment(b []byte) (orderedSegment, uint32) {
 	pos += 1
 	cur := orderedSegment{
 		segment: &segment{
-			flags: flag,
+			flags:  flag,
+			repeat: 1,
 		},
 		order: make([]byte, flag.getPosLen()),
 	}

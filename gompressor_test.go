@@ -5,6 +5,8 @@ import (
 	"math"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_countBytes(t *testing.T) {
@@ -50,21 +52,33 @@ func Test_encoding(t *testing.T) {
 	// }
 
 	block := compress(in, 2)
-	encodedBlock := encode(block)
-	decoded, err := decode(encodedBlock)
+	expectedSerialization := encode(block)
+	decoded, err := decode(expectedSerialization)
+	require.NoError(t, err)
 
-	t.Run("serialization", func(t *testing.T) {
+	t.Run("decoding", func(t *testing.T) {
+		require.Equal(t, len(block.head), len(decoded.head))
+		for i := range block.head {
+			cur := block.head[i]
+			cur.next = nil
+			cur.previous = nil
+			cur.pos = nil
+			require.Equal(t, block.head[i], decoded.head[i], "segment %d is different", i)
+		}
+	})
+
+	t.Run("encoding", func(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to parse serialize: %s", err)
 		}
 		got := encode(decoded)
-		if !bytes.Equal(encodedBlock, got) {
+		if !bytes.Equal(expectedSerialization, got) {
 			t.Fatal("buffer is variating in serialization")
 		}
 	})
 
 	t.Run("compression rate", func(t *testing.T) {
-		ratio := float64(len(encodedBlock)) / float64(len(in))
+		ratio := float64(len(expectedSerialization)) / float64(len(in))
 		if ratio > 1 {
 			t.Errorf("compression increased file size. ratio: %.2f", ratio)
 		}
@@ -72,15 +86,7 @@ func Test_encoding(t *testing.T) {
 
 	t.Run("reconstruction", func(t *testing.T) {
 		out := decompress(block)
-		if len(in) != len(out) {
-			t.Fatalf("output has different sizes")
-		}
-		for i := range in {
-			if out[i] != in[i] {
-				t.Logf("exp:\n%v\ngot:\n%v", in[i-10:i+10], out[i-10:i+10])
-				t.Fatalf("invalid reconstruction at pos %d expected %d got %d", i, in[i], out[i])
-			}
-		}
+		require.Equal(t, in, out)
 	})
 }
 
