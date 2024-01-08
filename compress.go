@@ -24,7 +24,7 @@ func Compress(in []byte) *block {
 				panic("repeat overflow")
 			}
 		}
-		if repeatCount < 2 {
+		if repeatCount < 5 {
 			continue
 		}
 		// avoid creating segments with nil buffer.
@@ -45,6 +45,6 @@ func Compress(in []byte) *block {
 	head.Deduplicate()
 	head.Optimize()
 
-	b.Segments = head.GetOrderedSegments()
+	b.Segments = GetOrderedSegments(head)
 	return &b
 }

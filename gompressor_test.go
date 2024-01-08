@@ -15,7 +15,7 @@ func Test_countBytes(t *testing.T) {
 		t.Fatalf("failed to read file: %s", err)
 	}
 
-	resp := countBytes(in)
+	resp := CountBytes(in)
 	t.Logf("%v", resp)
 	t.Fail()
 }
@@ -56,18 +56,9 @@ func Test_encoding(t *testing.T) {
 	decoded, err := Decode(expectedSerialization)
 	require.NoError(t, err)
 
-	t.Run("segment composition", func(t *testing.T) {
-		exp := [][]byte{
-			{0},
-			{1},
-			{2},
-		}
-
-		got := [][]byte{}
-		for i := range block.Segments {
-			got = append(got, block.Segments[i].Buffer)
-		}
-		require.Equal(t, exp, got)
+	t.Run("reconstruction", func(t *testing.T) {
+		out := Decompress(block)
+		require.Equal(t, in, out)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
@@ -97,19 +88,16 @@ func Test_encoding(t *testing.T) {
 			t.Errorf("compression increased file size. ratio: %.2f", ratio)
 		}
 	})
-
-	t.Run("reconstruction", func(t *testing.T) {
-		out := Decompress(block)
-		require.Equal(t, in, out)
-	})
 }
 
 func Test_bestMinSize(t *testing.T) {
-	in, err := os.ReadFile("/home/raicon/Pictures/Screenshot_20240105_145006.png")
-	//in, err := os.ReadFile("/bin/zsh")
+	// in, err := os.ReadFile("/home/raicon/Pictures/Screenshot_20240105_145006.png")
+	in, err := os.ReadFile("/bin/zsh")
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
+	// stats := CountRepetitions(in)
+	// t.Logf("%v", stats)
 	var segmentCount int
 	var highestRepeat int
 	var highestGain int64
@@ -118,7 +106,18 @@ func Test_bestMinSize(t *testing.T) {
 	newSize := int64(len(serialize))
 	segmentCount = len(block.Segments)
 
+	out := Decompress(block)
+	require.Equal(t, len(in), len(out), "input and output are different")
+	for i := range in {
+		require.Equal(t, in[i], out[i], "in[%d] != out[%d]", i, i)
+	}
+
+	var uncompressedLost int64
 	for _, entry := range block.Segments {
+		if entry.Metadata.getType() == typeUncompressed {
+			uncompressedLost += entry.GetCompressionGains()
+		}
+
 		if entry.Repeat > uint16(highestRepeat) {
 			highestRepeat = int(entry.Repeat)
 		}
@@ -129,10 +128,11 @@ func Test_bestMinSize(t *testing.T) {
 
 	ratio := float64(newSize) / float64(len(in))
 	t.Logf(`
-byte ratio			%.2f (%d / %d)
-compressed: 		%d bytes
-segments count: %d
-highest repeat: %d
-highest gain: 	%d bytes`, ratio, newSize, int64(len(in)), int64(len(in))-newSize, segmentCount, highestRepeat, highestGain)
-	t.Fail()
+byte ratio				%.2f (%d / %d)
+compressed: 			%d bytes
+uncompressedLost: %d bytes
+segments count: 	%d
+highest repeat: 	%d
+highest gain: 		%d bytes`,
+		ratio, newSize, int64(len(in)), int64(len(in))-newSize, uncompressedLost, segmentCount, highestRepeat, highestGain)
 }

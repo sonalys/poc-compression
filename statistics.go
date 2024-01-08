@@ -2,10 +2,26 @@ package gompressor
 
 import "math"
 
-func countBytes(input []byte) (repetition []uint) {
+func CountBytes(in []byte) (repetition []uint) {
 	repetition = make([]uint, 256)
-	for _, char := range input {
+	for _, char := range in {
 		repetition[char] = repetition[char] + 1
+	}
+	return
+}
+
+func CountRepetitions(in []byte) (repetition []map[int]uint) {
+	repetition = make([]map[int]uint, 256)
+	for i := range in {
+		char := in[i]
+		if repetition[char] == nil {
+			repetition[char] = make(map[int]uint)
+		}
+		var size int = 1
+		for j := i + 1; j < len(in) && in[j] == char; j++ {
+			size++
+		}
+		repetition[char][size] += 1
 	}
 	return
 }

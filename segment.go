@@ -55,27 +55,29 @@ func (s *Segment) Decompress() []byte {
 	}
 }
 
-// GetCompressionGains returns how many bytes this section is compressing.
-func (s *Segment) GetCompressionGains() int64 {
+func (s *Segment) GetOriginalSize() int64 {
 	repeat := int64(s.Repeat)
 	bufLen := int64(len(s.Buffer))
 	posLen := int64(len(s.Pos))
-
 	originalSize := repeat * bufLen * posLen
+	return originalSize
+}
 
-	// meta 	= 1 byte
-	// bufLen = 4 bytes
-	// -------------------
-	// total	=	5 bytes
-	compressedSize := int64(5)
+// GetCompressionGains returns how many bytes this section is compressing.
+func (s *Segment) GetCompressionGains() int64 {
+	posLen := int64(len(s.Pos))
+	bufLen := int64(len(s.Buffer))
+	originalSize := s.GetOriginalSize()
+	var compressedSize int64 = 5
 	// if segment is repeat, then +1 or +2 bytes.
 	if s.Metadata.getType() == typeRepeat {
-		compressedSize += 1
 		if s.Metadata.isRepeat2Bytes() {
+			compressedSize += 2
+		} else {
 			compressedSize += 1
 		}
 	}
-	compressedSize += posLen
+	compressedSize += posLen * 2
 	compressedSize += bufLen
 	gain := originalSize - compressedSize
 	return gain
@@ -83,7 +85,7 @@ func (s *Segment) GetCompressionGains() int64 {
 
 // GetOrderedSegments will convert a Segment into an OrderedSegment,
 // we do this to map pos, which occupies 4 bytes, to order, which is uses 1 byte.
-func (s *Segment) GetOrderedSegments() []DiskSegment {
+func GetOrderedSegments(head *Segment) []DiskSegment {
 	// segmentProjection is a projection abstraction to convert uint32 system coordinate to uint8.
 	// we can run this optimization because we don't care about segment position in final buffer,
 	// we only care about in which order they are decompressed.
@@ -94,7 +96,7 @@ func (s *Segment) GetOrderedSegments() []DiskSegment {
 	}
 	var projections []segmentProjection
 	var segList []*DiskSegment
-	cur := s
+	cur := head
 	for {
 		curSegment := &DiskSegment{
 			Segment: cur,
@@ -203,6 +205,16 @@ func (s *Segment) Deduplicate() {
 	}
 }
 
+// IsMergeable returns true if the segment can be merged with another.
+// TODO: maybe improve this logic, and receive another segment s2,
+// Calculate if they are always together relative to each other, but might not be worth the effort.
+func (s *Segment) IsMergeable() bool {
+	// For a segment to be mergeable, you need for it to only appear once,
+	// be uncompressed, and without repetitions.
+	// Otherwise you might merge segments of different repeats and positions, and distort the final data.
+	return len(s.Pos) == 1 && s.Repeat == 1 && s.Metadata.getType() == typeUncompressed
+}
+
 // Optimize is responsible for finding segments that are causing byte compression gain to be negative, and try to
 // revert it.
 func (s *Segment) Optimize() {
@@ -218,23 +230,23 @@ func (s *Segment) Optimize() {
 		type previousNextMap struct {
 			prev, next *Segment
 		}
-		siblings := make([]previousNextMap, 0, len(cur.Pos))
+		mergeable := make([]previousNextMap, 0, len(cur.Pos))
 		for _, pos := range cur.Pos {
-			if prev := s.FindSegment(pos - 1); prev != nil && prev.Repeat == 1 && prev.Metadata.getType() == typeUncompressed {
-				siblings = append(siblings, previousNextMap{
-					prev: prev,
+			if sibling, found := s.FindSegment(pos - 1); found && sibling.IsMergeable() {
+				mergeable = append(mergeable, previousNextMap{
+					prev: sibling,
 				})
 				continue
 			}
-			if next := s.FindSegment(pos + 1); next != nil && next.Repeat == 1 && next.Metadata.getType() == typeUncompressed {
-				siblings = append(siblings, previousNextMap{
-					next: next,
+			if sibling, found := s.FindSegment(pos + uint32(len(cur.Buffer))); found && sibling.IsMergeable() {
+				mergeable = append(mergeable, previousNextMap{
+					next: sibling,
 				})
 			}
 		}
-		// Check if all possible positions are revertable.
-		if len(siblings) == len(cur.Pos) {
-			for _, entry := range siblings {
+		// Check if all possible positions are mergeable.
+		if len(mergeable) == len(cur.Pos) {
+			for _, entry := range mergeable {
 				buf := bytes.Repeat(cur.Buffer, int(cur.Repeat))
 				if entry.prev != nil {
 					entry.prev.Buffer = append(entry.prev.Buffer, buf...)
@@ -253,12 +265,12 @@ func (s *Segment) Optimize() {
 }
 
 // FindSegment finds the segment that contains pos.
-func (s *Segment) FindSegment(pos uint32) *Segment {
+func (s *Segment) FindSegment(pos uint32) (*Segment, bool) {
 	cur := s
 	for {
 		for _, curPos := range cur.Pos {
 			if curPos <= pos && curPos+uint32(cur.Repeat)*uint32(len(cur.Buffer)) > pos {
-				return s
+				return cur, true
 			}
 		}
 		if cur.Next == nil {
@@ -266,5 +278,5 @@ func (s *Segment) FindSegment(pos uint32) *Segment {
 		}
 		cur = cur.Next
 	}
-	return nil
+	return nil, false
 }

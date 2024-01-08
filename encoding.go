@@ -23,7 +23,7 @@ func (cur DiskSegment) Encode() []byte {
 	}
 	// we don't need to store the first position, since our decompression logic doesn't use it.
 	for i := range cur.Order {
-		buffer = append(buffer, byte(cur.Order[i]))
+		buffer = encoder.AppendUint16(buffer, cur.Order[i])
 	}
 	buffer = append(buffer, cur.Buffer...)
 	return buffer
