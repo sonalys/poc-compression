@@ -1,9 +1,6 @@
 package gompressor
 
-func Compress(in []byte, minSize uint16) *block {
-	if minSize == 1 {
-		panic("minSize should be greater than 1")
-	}
+func Compress(in []byte) *block {
 	lenIn := uint32(len(in))
 	b := block{
 		size: lenIn,
@@ -22,8 +19,7 @@ func Compress(in []byte, minSize uint16) *block {
 				panic("repeat overflow")
 			}
 		}
-		// TODO: make byte gain calculation optimal so we don't need variable minSize, always 2.
-		if repeatCount < minSize {
+		if repeatCount < 2 {
 			continue
 		}
 		// avoid creating segments with nil buffer.

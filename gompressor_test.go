@@ -51,7 +51,7 @@ func Test_encoding(t *testing.T) {
 	// 	t.Fatalf("failed to read file: %s", err)
 	// }
 
-	block := Compress(in, 2)
+	block := Compress(in)
 	expectedSerialization := encode(block)
 	decoded, err := decode(expectedSerialization)
 	require.NoError(t, err)
@@ -105,41 +105,35 @@ func Test_encoding(t *testing.T) {
 }
 
 func Test_bestMinSize(t *testing.T) {
-	in, err := os.ReadFile("/home/raicon/Pictures/Screenshot_20240105_145006.png")
+	in, err := os.ReadFile("/bin/zsh")
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
-	var bestSize int64 = math.MaxInt64
 	var segmentCount int
 	var highestRepeat int
 	var highestGain int64
 	bestGroupSize := -1
-	for groupSize := 2; groupSize < 30; groupSize++ {
-		block := Compress(in, uint16(groupSize))
-		serialize := encode(block)
-		newSize := int64(len(serialize))
-		if newSize >= bestSize {
-			continue
+	block := Compress(in)
+	serialize := encode(block)
+	newSize := int64(len(serialize))
+	segmentCount = len(block.head)
+
+	for _, entry := range block.head {
+		if entry.repeat > uint16(highestRepeat) {
+			highestRepeat = int(entry.repeat)
 		}
-		bestSize = newSize
-		bestGroupSize = groupSize
-		segmentCount = len(block.head)
-		for _, entry := range block.head {
-			if entry.repeat > uint16(highestRepeat) {
-				highestRepeat = int(entry.repeat)
-			}
-			if gain := entry.GetCompressionGains(); gain > highestGain {
-				highestGain = gain
-			}
+		if gain := entry.GetCompressionGains(); gain > highestGain {
+			highestGain = gain
 		}
 	}
-	ratio := float64(bestSize) / float64(len(in))
+
+	ratio := float64(newSize) / float64(len(in))
 	t.Logf(`
 byte ratio			%.2f (%d / %d)
 compressed: 		%d bytes
 best minSize		%d
 segments count: %d
 highest repeat: %d
-highest gain: 	%d bytes`, ratio, bestSize, int64(len(in)), int64(len(in))-bestSize, bestGroupSize, segmentCount, highestRepeat, highestGain)
+highest gain: 	%d bytes`, ratio, newSize, int64(len(in)), int64(len(in))-newSize, bestGroupSize, segmentCount, highestRepeat, highestGain)
 	t.Fail()
 }
