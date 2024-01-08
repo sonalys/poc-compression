@@ -11,55 +11,55 @@ type (
 	// My cats are still trying to reach to me about how to increase segments efficiency in disk, so stay tuned.
 
 	block struct {
-		size     uint32
-		segments []diskSegment
+		Size     uint32
+		Segments []DiskSegment
 	}
 
-	// segment
+	// Segment
 	// memory serialization requires magic to avoid storing as much bytes as possible,
 	// while still being able to recover the struct and reconstruct the original buffer.
-	segment struct {
+	Segment struct {
 		// segment metadata.
-		flags meta
-		// repeat indicates how many times buffer is repeated. that's not the same as pos.
+		Metadata meta
+		// Repeat indicates how many times buffer is repeated. that's not the same as pos.
 		// we are only storing this field in disk if the segment type is typeRepeat.
-		repeat uint16
-		// buffer can hold at maximum 4294967295 bytes, or 4.294967 gigabytes.
-		buffer []byte
+		Repeat uint16
+		// Buffer can hold at maximum 4294967295 bytes, or 4.294967 gigabytes.
+		Buffer []byte
 
 		// No need to serialize the fields below on disk.
-		// previous, next elements in linked list.
-		previous, next *segment
+		// Previous, Next elements in linked list.
+		Previous, Next *Segment
 		// positions in which this segment repeats itself, max 32 positions.
-		pos []uint32 // todo: no need to hold pos if there is only 1 value.
+		Pos []uint32 // todo: no need to hold pos if there is only 1 value.
 	}
 
-	diskSegment struct {
-		*segment
+	DiskSegment struct {
+		*Segment
 
-		// order represents in which order this segment should be executed on decode.
+		// Order represents in which Order this segment should be executed on decode.
 		// max 255 segments per block.
 		// TODO: maybe allow dynamic sizing here as well.
-		order []uint8
+		Order []uint16
 	}
 )
 
-func (s *segment) Decompress() []byte {
-	switch s.flags.getType() {
+func (s *Segment) Decompress() []byte {
+	switch s.Metadata.getType() {
 	case typeUncompressed:
-		return s.buffer
+		return s.Buffer
 	case typeRepeat:
-		return bytes.Repeat(s.buffer, int(s.repeat))
+		return bytes.Repeat(s.Buffer, int(s.Repeat))
 	default:
 		panic("invalid segment type")
 	}
 }
 
 // GetCompressionGains returns how many bytes this section is compressing.
-func (s *segment) GetCompressionGains() int64 {
-	repeat := int64(s.repeat)
-	bufLen := int64(len(s.buffer))
-	posLen := int64(len(s.pos))
+func (s *Segment) GetCompressionGains() int64 {
+	repeat := int64(s.Repeat)
+	bufLen := int64(len(s.Buffer))
+	posLen := int64(len(s.Pos))
 
 	originalSize := repeat * bufLen * posLen
 
@@ -69,9 +69,9 @@ func (s *segment) GetCompressionGains() int64 {
 	// total	=	5 bytes
 	compressedSize := int64(5)
 	// if segment is repeat, then +1 or +2 bytes.
-	if s.flags.getType() == typeRepeat {
+	if s.Metadata.getType() == typeRepeat {
 		compressedSize += 1
-		if s.flags.isRepeat2Bytes() {
+		if s.Metadata.isRepeat2Bytes() {
 			compressedSize += 1
 		}
 	}
@@ -83,33 +83,33 @@ func (s *segment) GetCompressionGains() int64 {
 
 // GetOrderedSegments will convert a Segment into an OrderedSegment,
 // we do this to map pos, which occupies 4 bytes, to order, which is uses 1 byte.
-func GetOrderedSegments(s *segment) []diskSegment {
+func (s *Segment) GetOrderedSegments() []DiskSegment {
 	// segmentProjection is a projection abstraction to convert uint32 system coordinate to uint8.
 	// we can run this optimization because we don't care about segment position in final buffer,
 	// we only care about in which order they are decompressed.
 	type segmentProjection struct {
 		pos     uint32
-		order   uint8
-		segment *diskSegment
+		order   uint16
+		segment *DiskSegment
 	}
 	var projections []segmentProjection
-	var segList []*diskSegment
+	var segList []*DiskSegment
 	cur := s
 	for {
-		curSegment := &diskSegment{
-			segment: cur,
+		curSegment := &DiskSegment{
+			Segment: cur,
 		}
 		segList = append(segList, curSegment)
-		for _, pos := range cur.pos {
+		for _, pos := range cur.Pos {
 			projections = append(projections, segmentProjection{
 				pos:     pos,
 				segment: curSegment,
 			})
 		}
-		if cur.next == nil {
+		if cur.Next == nil {
 			break
 		}
-		cur = cur.next
+		cur = cur.Next
 	}
 	sort.Slice(projections, func(i, j int) bool {
 		return projections[i].pos < projections[j].pos
@@ -124,10 +124,10 @@ func GetOrderedSegments(s *segment) []diskSegment {
 	}
 	// all projections link to their respective segments, so the same segment can have many projections.
 	for _, entry := range projections {
-		entry.segment.order = append(entry.segment.order, entry.order)
+		entry.segment.Order = append(entry.segment.Order, entry.order)
 	}
 	// here we are simply converting the projection back to an orderedSegment.
-	finalList := make([]diskSegment, 0, len(segList))
+	finalList := make([]DiskSegment, 0, len(segList))
 	for i := range segList {
 		finalList = append(finalList, *segList[i])
 	}
@@ -135,136 +135,136 @@ func GetOrderedSegments(s *segment) []diskSegment {
 }
 
 // NewSegment creates a new segment.
-func NewSegment(t segType, pos uint32, repeat uint16, buffer []byte) *segment {
+func NewSegment(t segType, pos uint32, repeat uint16, buffer []byte) *Segment {
 	flags := meta(0)
 	flags = flags.setIsRepeat2Bytes(repeat > math.MaxUint8)
 	flags = flags.setPosLen(1)
 	flags = flags.setType(t)
-	resp := &segment{
-		flags:  flags,
-		repeat: repeat,
-		buffer: buffer,
-		pos:    []uint32{pos},
+	resp := &Segment{
+		Metadata: flags,
+		Repeat:   repeat,
+		Buffer:   buffer,
+		Pos:      []uint32{pos},
 	}
 	return resp
 }
 
 // AddPos will append all positions from pos into the current segment,
 // it will return error if it overflows the maximum capacity of the segment.
-func (s *segment) AddPos(pos []uint32) (*segment, error) {
-	newLen := len(s.pos) + len(pos)
+func (s *Segment) AddPos(pos []uint32) (*Segment, error) {
+	newLen := len(s.Pos) + len(pos)
 	if newLen > 0b11111 {
 		// TODO: add better handling for repeating groups.
 		return s, fmt.Errorf("len(pos) overflow")
 	}
-	s.flags = s.flags.setPosLen(uint8(newLen))
-	s.pos = append(s.pos, pos...)
+	s.Metadata = s.Metadata.setPosLen(uint8(newLen))
+	s.Pos = append(s.Pos, pos...)
 	return s, nil
 }
 
 // Add append a new segment to the linked list.
-func (s *segment) Add(next *segment) *segment {
-	s.next = next
-	next.previous = s
+func (s *Segment) Add(next *Segment) *Segment {
+	s.Next = next
+	next.Previous = s
 	return next
 }
 
 // Remove dereferences this segment from the linked list.
-func (s *segment) Remove() {
-	if s.previous != nil {
-		s.previous.next = s.next
+func (s *Segment) Remove() {
+	if s.Previous != nil {
+		s.Previous.Next = s.Next
 	}
-	if s.next != nil {
-		s.next.previous = s.previous
+	if s.Next != nil {
+		s.Next.Previous = s.Previous
 	}
 }
 
 // Deduplicate will find segments that are identical, besides position, and merge them.
-func (s *segment) Deduplicate() {
+func (s *Segment) Deduplicate() {
 	cur := s
 	for {
 		iter := cur
 		for {
-			if iter = iter.next; iter == nil {
+			if iter = iter.Next; iter == nil {
 				break
 			}
-			if !bytes.Equal(cur.buffer, iter.buffer) || cur.repeat != iter.repeat || cur.flags.getType() != iter.flags.getType() {
+			if !bytes.Equal(cur.Buffer, iter.Buffer) || cur.Repeat != iter.Repeat || cur.Metadata.getType() != iter.Metadata.getType() {
 				continue
 			}
 			// if pos doesn't overflow, we continue with the merge operation.
-			if _, err := cur.AddPos(iter.pos); err == nil {
+			if _, err := cur.AddPos(iter.Pos); err == nil {
 				iter.Remove()
 			}
 		}
-		if cur.next == nil {
+		if cur.Next == nil {
 			break
 		}
-		cur = cur.next
+		cur = cur.Next
 	}
 }
 
 // Optimize is responsible for finding segments that are causing byte compression gain to be negative, and try to
 // revert it.
-func (s *segment) Optimize() {
+func (s *Segment) Optimize() {
 	cur := s
 	for {
 		if cur == nil {
 			break
 		}
-		if cur.GetCompressionGains() > 0 || cur.previous == nil {
-			cur = cur.next
+		if cur.GetCompressionGains() > 0 || cur.Previous == nil {
+			cur = cur.Next
 			continue
 		}
 		type previousNextMap struct {
-			prev, next *segment
+			prev, next *Segment
 		}
-		siblings := make([]previousNextMap, 0, len(cur.pos))
-		for _, pos := range cur.pos {
-			if prev := s.FindSegment(pos - 1); prev != nil && prev.repeat == 1 && prev.flags.getType() == typeUncompressed {
+		siblings := make([]previousNextMap, 0, len(cur.Pos))
+		for _, pos := range cur.Pos {
+			if prev := s.FindSegment(pos - 1); prev != nil && prev.Repeat == 1 && prev.Metadata.getType() == typeUncompressed {
 				siblings = append(siblings, previousNextMap{
 					prev: prev,
 				})
 				continue
 			}
-			if next := s.FindSegment(pos + 1); next != nil && next.repeat == 1 && next.flags.getType() == typeUncompressed {
+			if next := s.FindSegment(pos + 1); next != nil && next.Repeat == 1 && next.Metadata.getType() == typeUncompressed {
 				siblings = append(siblings, previousNextMap{
 					next: next,
 				})
 			}
 		}
 		// Check if all possible positions are revertable.
-		if len(siblings) == len(cur.pos) {
+		if len(siblings) == len(cur.Pos) {
 			for _, entry := range siblings {
-				buf := bytes.Repeat(cur.buffer, int(cur.repeat))
+				buf := bytes.Repeat(cur.Buffer, int(cur.Repeat))
 				if entry.prev != nil {
-					entry.prev.buffer = append(entry.prev.buffer, buf...)
+					entry.prev.Buffer = append(entry.prev.Buffer, buf...)
 					continue
 				}
 				if entry.next != nil {
 					// since we are tweaking the beginning of the buffer, we have to update position.
-					entry.next.pos[0] -= uint32(len(buf))
-					entry.next.buffer = append(buf, entry.next.buffer...)
+					entry.next.Pos[0] -= uint32(len(buf))
+					entry.next.Buffer = append(buf, entry.next.Buffer...)
 				}
 			}
 			cur.Remove()
 		}
-		cur = cur.next
+		cur = cur.Next
 	}
 }
 
 // FindSegment finds the segment that contains pos.
-func (s *segment) FindSegment(pos uint32) *segment {
+func (s *Segment) FindSegment(pos uint32) *Segment {
 	cur := s
 	for {
-		for _, curPos := range cur.pos {
-			if curPos <= pos && curPos+uint32(cur.repeat)*uint32(len(cur.buffer)) > pos {
+		for _, curPos := range cur.Pos {
+			if curPos <= pos && curPos+uint32(cur.Repeat)*uint32(len(cur.Buffer)) > pos {
 				return s
 			}
 		}
-		if cur.next == nil {
+		if cur.Next == nil {
 			break
 		}
-		cur = cur.next
+		cur = cur.Next
 	}
 	return nil
 }

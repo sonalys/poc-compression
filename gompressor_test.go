@@ -52,8 +52,8 @@ func Test_encoding(t *testing.T) {
 	// }
 
 	block := Compress(in)
-	expectedSerialization := encode(block)
-	decoded, err := decode(expectedSerialization)
+	expectedSerialization := Encode(block)
+	decoded, err := Decode(expectedSerialization)
 	require.NoError(t, err)
 
 	t.Run("segment composition", func(t *testing.T) {
@@ -64,20 +64,20 @@ func Test_encoding(t *testing.T) {
 		}
 
 		got := [][]byte{}
-		for i := range block.segments {
-			got = append(got, block.segments[i].buffer)
+		for i := range block.Segments {
+			got = append(got, block.Segments[i].Buffer)
 		}
 		require.Equal(t, exp, got)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
-		require.Equal(t, len(block.segments), len(decoded.segments))
-		for i := range block.segments {
-			cur := block.segments[i]
-			cur.next = nil
-			cur.previous = nil
-			cur.pos = nil
-			require.Equal(t, block.segments[i], decoded.segments[i], "segment %d is different", i)
+		require.Equal(t, len(block.Segments), len(decoded.Segments))
+		for i := range block.Segments {
+			cur := block.Segments[i]
+			cur.Next = nil
+			cur.Previous = nil
+			cur.Pos = nil
+			require.Equal(t, block.Segments[i], decoded.Segments[i], "segment %d is different", i)
 		}
 	})
 
@@ -85,7 +85,7 @@ func Test_encoding(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to parse serialize: %s", err)
 		}
-		got := encode(decoded)
+		got := Encode(decoded)
 		if !bytes.Equal(expectedSerialization, got) {
 			t.Fatal("buffer is variating in serialization")
 		}
@@ -105,22 +105,22 @@ func Test_encoding(t *testing.T) {
 }
 
 func Test_bestMinSize(t *testing.T) {
-	in, err := os.ReadFile("/bin/zsh")
+	in, err := os.ReadFile("/home/raicon/Pictures/Screenshot_20240105_145006.png")
+	//in, err := os.ReadFile("/bin/zsh")
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
 	var segmentCount int
 	var highestRepeat int
 	var highestGain int64
-	bestGroupSize := -1
 	block := Compress(in)
-	serialize := encode(block)
+	serialize := Encode(block)
 	newSize := int64(len(serialize))
-	segmentCount = len(block.segments)
+	segmentCount = len(block.Segments)
 
-	for _, entry := range block.segments {
-		if entry.repeat > uint16(highestRepeat) {
-			highestRepeat = int(entry.repeat)
+	for _, entry := range block.Segments {
+		if entry.Repeat > uint16(highestRepeat) {
+			highestRepeat = int(entry.Repeat)
 		}
 		if gain := entry.GetCompressionGains(); gain > highestGain {
 			highestGain = gain
@@ -131,9 +131,8 @@ func Test_bestMinSize(t *testing.T) {
 	t.Logf(`
 byte ratio			%.2f (%d / %d)
 compressed: 		%d bytes
-best minSize		%d
 segments count: %d
 highest repeat: %d
-highest gain: 	%d bytes`, ratio, newSize, int64(len(in)), int64(len(in))-newSize, bestGroupSize, segmentCount, highestRepeat, highestGain)
+highest gain: 	%d bytes`, ratio, newSize, int64(len(in)), int64(len(in))-newSize, segmentCount, highestRepeat, highestGain)
 	t.Fail()
 }

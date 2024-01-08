@@ -86,8 +86,8 @@ func Test_segment_addPos(t *testing.T) {
 		pos      []uint32
 		repeat   uint16
 		buffer   []byte
-		previous *segment
-		next     *segment
+		previous *Segment
+		next     *Segment
 	}
 	type args struct {
 		pos []uint32
@@ -96,14 +96,14 @@ func Test_segment_addPos(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *segment
+		want    *Segment
 		wantErr bool
 	}{
 		{
 			name:    "pos overflow from args",
 			fields:  fields{},
 			args:    args{make([]uint32, 32)},
-			want:    &segment{},
+			want:    &Segment{},
 			wantErr: true,
 		},
 		{
@@ -112,8 +112,8 @@ func Test_segment_addPos(t *testing.T) {
 				pos: make([]uint32, 16),
 			},
 			args: args{make([]uint32, 16)},
-			want: &segment{
-				pos: make([]uint32, 16),
+			want: &Segment{
+				Pos: make([]uint32, 16),
 			},
 			wantErr: true,
 		},
@@ -126,24 +126,24 @@ func Test_segment_addPos(t *testing.T) {
 				buffer: []byte{1},
 			},
 			args: args{pos: []uint32{1, 2}},
-			want: &segment{
-				flags:  meta(0b00010000),
-				pos:    []uint32{1, 2},
-				repeat: 1,
-				buffer: []byte{1},
+			want: &Segment{
+				Metadata: meta(0b00010000),
+				Pos:      []uint32{1, 2},
+				Repeat:   1,
+				Buffer:   []byte{1},
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &segment{
-				flags:    tt.fields.flags,
-				pos:      tt.fields.pos,
-				repeat:   tt.fields.repeat,
-				buffer:   tt.fields.buffer,
-				previous: tt.fields.previous,
-				next:     tt.fields.next,
+			s := &Segment{
+				Metadata: tt.fields.flags,
+				Pos:      tt.fields.pos,
+				Repeat:   tt.fields.repeat,
+				Buffer:   tt.fields.buffer,
+				Previous: tt.fields.previous,
+				Next:     tt.fields.next,
 			}
 			got, err := s.AddPos(tt.args.pos)
 			if (err != nil) != tt.wantErr {

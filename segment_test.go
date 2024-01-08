@@ -8,17 +8,17 @@ import (
 
 func Test_GetCompressionGain(t *testing.T) {
 	t.Run("positive gain", func(t *testing.T) {
-		seg := &diskSegment{
-			order: []uint8{0, 1},
-			segment: &segment{
-				flags:  meta(typeRepeat),
-				repeat: 50,
-				buffer: []byte{1, 2},
-				pos:    []uint32{0, 100},
+		seg := &DiskSegment{
+			Order: []uint16{0, 1},
+			Segment: &Segment{
+				Metadata: meta(typeRepeat),
+				Repeat:   50,
+				Buffer:   []byte{1, 2},
+				Pos:      []uint32{0, 100},
 			},
 		}
 
-		compressed := seg.encodeSegment()
+		compressed := seg.Encode()
 		originalSize := int64(200)
 		compressedSize := int64(len(compressed))
 		gains := seg.GetCompressionGains()
@@ -27,17 +27,17 @@ func Test_GetCompressionGain(t *testing.T) {
 	})
 
 	t.Run("negative gain", func(t *testing.T) {
-		seg := &diskSegment{
-			order: []uint8{0, 1},
-			segment: &segment{
-				flags:  meta(typeUncompressed),
-				repeat: 1,
-				buffer: []byte{1, 2},
-				pos:    []uint32{0, 100},
+		seg := &DiskSegment{
+			Order: []uint16{0, 1},
+			Segment: &Segment{
+				Metadata: meta(typeUncompressed),
+				Repeat:   1,
+				Buffer:   []byte{1, 2},
+				Pos:      []uint32{0, 100},
 			},
 		}
 
-		compressed := seg.encodeSegment()
+		compressed := seg.Encode()
 		originalSize := int64(4)
 		compressedSize := int64(len(compressed))
 		gains := seg.GetCompressionGains()

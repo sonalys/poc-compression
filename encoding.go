@@ -5,77 +5,77 @@ import "encoding/binary"
 var encoder = binary.BigEndian
 var decoder = binary.BigEndian
 
-func (cur diskSegment) encodeSegment() []byte {
-	bufLen := uint32(len(cur.buffer))
+func (cur DiskSegment) Encode() []byte {
+	bufLen := uint32(len(cur.Buffer))
 	// allocate buffers.
-	orderLen := uint8(len(cur.order))
-	cur.flags = cur.flags.setPosLen(orderLen)
+	orderLen := uint8(len(cur.Order))
+	cur.Metadata = cur.Metadata.setPosLen(orderLen)
 	buffer := make([]byte, 0, 7+bufLen+uint32(orderLen))
 	// start storing the binary.
-	buffer = append(buffer, byte(cur.flags))
+	buffer = append(buffer, byte(cur.Metadata))
 	buffer = encoder.AppendUint32(buffer, bufLen)
-	if cur.flags.getType() == typeRepeat {
-		if cur.flags.isRepeat2Bytes() {
-			buffer = encoder.AppendUint16(buffer, cur.repeat)
+	if cur.Metadata.getType() == typeRepeat {
+		if cur.Metadata.isRepeat2Bytes() {
+			buffer = encoder.AppendUint16(buffer, cur.Repeat)
 		} else {
-			buffer = append(buffer, byte(cur.repeat))
+			buffer = append(buffer, byte(cur.Repeat))
 		}
 	}
 	// we don't need to store the first position, since our decompression logic doesn't use it.
-	for i := range cur.order {
-		buffer = append(buffer, byte(cur.order[i]))
+	for i := range cur.Order {
+		buffer = append(buffer, byte(cur.Order[i]))
 	}
-	buffer = append(buffer, cur.buffer...)
+	buffer = append(buffer, cur.Buffer...)
 	return buffer
 }
 
-func decodeSegment(b []byte) (diskSegment, uint32) {
+func DecodeSegment(b []byte) (DiskSegment, uint32) {
 	var pos uint32
 	flag := meta(b[pos])
 	pos += 1
-	cur := diskSegment{
-		segment: &segment{
-			flags:  flag,
-			repeat: 1,
+	cur := DiskSegment{
+		Segment: &Segment{
+			Metadata: flag,
+			Repeat:   1,
 		},
-		order: make([]byte, flag.getPosLen()),
+		Order: make([]uint16, flag.getPosLen()),
 	}
 	bufLen := decoder.Uint32(b[pos:])
 	pos += 4
-	cur.buffer = make([]byte, bufLen)
+	cur.Buffer = make([]byte, bufLen)
 	if flag.getType() == typeRepeat {
 		if flag.isRepeat2Bytes() {
-			cur.repeat = decoder.Uint16(b[pos:])
+			cur.Repeat = decoder.Uint16(b[pos:])
 			pos += 2
 		} else {
-			cur.repeat = uint16(b[pos])
+			cur.Repeat = uint16(b[pos])
 			pos += 1
 		}
 	}
-	for i := range cur.order {
-		cur.order[i] = b[pos]
-		pos += 1
+	for i := range cur.Order {
+		cur.Order[i] = decoder.Uint16(b[pos:])
+		pos += 2
 	}
-	cur.buffer = b[pos : pos+bufLen]
+	cur.Buffer = b[pos : pos+bufLen]
 	return cur, pos + bufLen
 }
 
-func encode(b *block) []byte {
-	buffer := make([]byte, 0, b.size)
+func Encode(b *block) []byte {
+	buffer := make([]byte, 0, b.Size)
 	// Store original size of the buffer.
-	buffer = encoder.AppendUint32(buffer, b.size)
+	buffer = encoder.AppendUint32(buffer, b.Size)
 	// Iterate from head to tail of segments.
-	for _, entry := range b.segments {
-		buffer = append(buffer, entry.encodeSegment()...)
+	for _, entry := range b.Segments {
+		buffer = append(buffer, entry.Encode()...)
 	}
 	return buffer
 }
 
-func decode(b []byte) (out *block, err error) {
+func Decode(b []byte) (out *block, err error) {
 	var pos uint32
 	out = &block{
-		size:     decoder.Uint32(b[0:]),
-		segments: make([]diskSegment, 0),
+		Size:     decoder.Uint32(b[0:]),
+		Segments: make([]DiskSegment, 0),
 	}
 	pos += 4
 	var i uint8
@@ -83,8 +83,8 @@ func decode(b []byte) (out *block, err error) {
 		if pos == uint32(len(b)) {
 			break
 		}
-		cur, offset := decodeSegment(b[pos:])
-		out.segments = append(out.segments, cur)
+		cur, offset := DecodeSegment(b[pos:])
+		out.Segments = append(out.Segments, cur)
 		pos += offset
 		i++
 		if i == 0 {
