@@ -53,20 +53,18 @@ func (s *segment) GetCompressionGains() int64 {
 	originalSize := repeat * bufLen * posLen
 
 	// meta 	= 1 byte
-	// repeat = 1 byte
 	// bufLen = 4 bytes
 	// -------------------
-	// total	=	6 bytes
+	// total	=	5 bytes
 	compressedSize := int64(5)
+	// if segment is repeat, then +1 or +2 bytes.
 	if s.flags.getType() == typeRepeat {
 		compressedSize += 1
 		if s.flags.isRepeat2Bytes() {
-			// if repeat is 2 bytes, then we sum +1.
 			compressedSize += 1
 		}
 	}
-	// 1 byte per order, -1 because the first pos is discarded.
-	compressedSize += posLen - 1
+	compressedSize += posLen
 	compressedSize += bufLen
 	gain := originalSize - compressedSize
 	return gain
@@ -194,38 +192,46 @@ func (s *segment) Deduplicate() {
 // revert it.
 func (s *segment) Optimize() {
 	cur := s
-	modified := false
 	for {
 		if cur == nil {
-			if modified {
-				cur = s
-				modified = false
-				continue
-			}
 			break
 		}
 		if cur.GetCompressionGains() > 0 || cur.previous == nil {
 			cur = cur.next
 			continue
 		}
-		previousList := make([]*segment, 0, len(cur.pos))
-		for _, pos := range cur.pos {
-			// If we don't find the previous segment in any block, we can't optimize it,
-			// so we just go to the next optimizable segment.
-			prev := s.FindSegment(pos - 1)
-			if prev == nil || prev.flags.getType() != typeUncompressed {
-				break
-			}
-			previousList = append(previousList, prev)
+		type previousNextMap struct {
+			prev, next *segment
 		}
-		// we batch them together to create an atomic operation, either we do it or we dont, no half-way.
-		if len(previousList) == len(cur.pos) {
-			for _, previous := range previousList {
-				previous.buffer = append(previous.buffer, bytes.Repeat(cur.buffer, int(cur.repeat))...)
+		siblings := make([]previousNextMap, 0, len(cur.pos))
+		for _, pos := range cur.pos {
+			if prev := s.FindSegment(pos - 1); prev != nil && prev.repeat == 1 && prev.flags.getType() == typeUncompressed {
+				siblings = append(siblings, previousNextMap{
+					prev: prev,
+				})
+				continue
 			}
-			// remove segment from linked list.
-			cur.previous.next = cur.next
-			modified = true
+			if next := s.FindSegment(pos + 1); next != nil && next.repeat == 1 && next.flags.getType() == typeUncompressed {
+				siblings = append(siblings, previousNextMap{
+					next: next,
+				})
+			}
+		}
+		// Check if all possible positions are revertable.
+		if len(siblings) == len(cur.pos) {
+			for _, entry := range siblings {
+				buf := bytes.Repeat(cur.buffer, int(cur.repeat))
+				if entry.prev != nil {
+					entry.prev.buffer = append(entry.prev.buffer, buf...)
+					continue
+				}
+				if entry.next != nil {
+					// since we are tweaking the beginning of the buffer, we have to update position.
+					entry.next.pos[0] -= uint32(len(buf))
+					entry.next.buffer = append(buf, entry.next.buffer...)
+				}
+			}
+			cur.Remove()
 		}
 		cur = cur.next
 	}

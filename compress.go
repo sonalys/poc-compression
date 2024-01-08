@@ -42,7 +42,7 @@ func Compress(in []byte, minSize uint16) *block {
 	}
 
 	head.Deduplicate()
-	// head.optimize()
+	head.Optimize()
 
 	b.head = GetOrderedSegments(head)
 

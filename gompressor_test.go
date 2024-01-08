@@ -105,7 +105,7 @@ func Test_encoding(t *testing.T) {
 }
 
 func Test_bestMinSize(t *testing.T) {
-	in, err := os.ReadFile("/bin/zsh")
+	in, err := os.ReadFile("/home/raicon/Pictures/Screenshot_20240105_145006.png")
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
