@@ -8,22 +8,11 @@ import (
 )
 
 type (
-	// meta is a bitmask used to store metadata.
-	// Address	|		data
-	//
-	//	1, 2					Segment types = max 4.
-	//	3							Repeat size, 0 = 1 byte, 1 = 2 bytes.
-	//	4,5,6,7,8			posLen = max 32.
-	meta uint8
-
-	segType uint8
-
 	// My cats are still trying to reach to me about how to increase segments efficiency in disk, so stay tuned.
 
 	block struct {
-		size   uint32
-		parsed bool
-		head   []orderedSegment
+		size uint32
+		head []orderedSegment
 	}
 
 	// segment
@@ -39,10 +28,8 @@ type (
 		buffer []byte
 
 		// No need to serialize the fields below on disk.
-
 		// previous, next elements in linked list.
 		previous, next *segment
-
 		// positions in which this segment repeats itself, max 32 positions.
 		pos []uint32 // todo: no need to hold pos if there is only 1 value.
 	}
@@ -57,8 +44,8 @@ type (
 	}
 )
 
-// returns how many bytes this section is compressing.
-func (s *segment) getCompressionGains() int64 {
+// GetCompressionGains returns how many bytes this section is compressing.
+func (s *segment) GetCompressionGains() int64 {
 	repeat := int64(s.repeat)
 	bufLen := int64(len(s.buffer))
 	posLen := int64(len(s.pos))
@@ -82,13 +69,12 @@ func (s *segment) getCompressionGains() int64 {
 	compressedSize += posLen - 1
 	compressedSize += bufLen
 	gain := originalSize - compressedSize
-	if gain < 0 {
-		// print("fuck")
-	}
 	return gain
 }
 
-func getOrderedSegments(s *segment) []orderedSegment {
+// GetOrderedSegments will convert a Segment into an OrderedSegment,
+// we do this to map pos, which occupies 4 bytes, to order, which is uses 1 byte.
+func GetOrderedSegments(s *segment) []orderedSegment {
 	// segmentProjection is a projection abstraction to convert uint32 system coordinate to uint8.
 	// we can run this optimization because we don't care about segment position in final buffer,
 	// we only care about in which order they are decompressed.
@@ -135,44 +121,8 @@ func getOrderedSegments(s *segment) []orderedSegment {
 	return finalList
 }
 
-const (
-	typeUncompressed segType = 0b0
-	typeRepeat       segType = 0b1
-
-	flagRepeatIs2Bytes meta = 0b1 << 2
-)
-
-// setPosLen
-// 1. clears the last 5 bytes
-// 2. left shift value 3 bytes
-// 3. set value of posLen.
-func (m meta) setPosLen(size uint8) meta {
-	return m&0b111 | (meta(size) << 3)
-}
-
-// getPosLen
-// right shift 3 bytes to get original posLen.
-func (m meta) getPosLen() byte { return byte(m >> 3) }
-
-// setType
-// 1. clears bytes 2 and 3
-// 1. set bytes 2 and 3
-func (m meta) setType(t segType) meta { return (m & 0b11111100) | meta(t) }
-
-// getType
-// clear all bytes except 2 and 3
-// shift right 1 byte to get segType
-func (m meta) getType() segType { return segType(m & 0b11) }
-
-func (m meta) isRepeat2Bytes() bool { return m&flagRepeatIs2Bytes != 0 }
-func (m meta) setIsRepeat2Bytes(value bool) meta {
-	if value {
-		return m | flagRepeatIs2Bytes
-	}
-	return m &^ flagRepeatIs2Bytes
-}
-
-func newSegment(t segType, pos uint32, repeat uint16, buffer []byte) *segment {
+// NewSegment creates a new segment.
+func NewSegment(t segType, pos uint32, repeat uint16, buffer []byte) *segment {
 	flags := meta(0)
 	flags = flags.setIsRepeat2Bytes(repeat > math.MaxUint8)
 	flags = flags.setPosLen(1)
@@ -186,7 +136,9 @@ func newSegment(t segType, pos uint32, repeat uint16, buffer []byte) *segment {
 	return resp
 }
 
-func (s *segment) addPos(pos []uint32) (*segment, error) {
+// AddPos will append all positions from pos into the current segment,
+// it will return error if it overflows the maximum capacity of the segment.
+func (s *segment) AddPos(pos []uint32) (*segment, error) {
 	newLen := len(s.pos) + len(pos)
 	if newLen > 0b11111 {
 		// TODO: add better handling for repeating groups.
@@ -197,49 +149,62 @@ func (s *segment) addPos(pos []uint32) (*segment, error) {
 	return s, nil
 }
 
-func (s *segment) add(next *segment) *segment {
+// Add append a new segment to the linked list.
+func (s *segment) Add(next *segment) *segment {
 	s.next = next
 	next.previous = s
 	return next
 }
 
-// deduplicate repetition groups of same size and same buffer.
-func (b *segment) deduplicate() {
-	current := b
+// Remove dereferences this segment from the linked list.
+func (s *segment) Remove() {
+	if s.previous != nil {
+		s.previous.next = s.next
+	}
+	if s.next != nil {
+		s.next.previous = s.previous
+	}
+}
+
+// Deduplicate will find segments that are identical, besides position, and merge them.
+func (s *segment) Deduplicate() {
+	cur := s
 	for {
-		iter := current
+		iter := cur
 		for {
 			if iter = iter.next; iter == nil {
 				break
 			}
-			if !bytes.Equal(current.buffer, iter.buffer) || current.repeat != iter.repeat || current.flags.getType() != iter.flags.getType() {
+			if !bytes.Equal(cur.buffer, iter.buffer) || cur.repeat != iter.repeat || cur.flags.getType() != iter.flags.getType() {
 				continue
 			}
 			// if pos doesn't overflow, we continue with the merge operation.
-			if _, err := current.addPos(iter.pos); err == nil {
-				iter.previous.next = iter.next
+			if _, err := cur.AddPos(iter.pos); err == nil {
+				iter.Remove()
 			}
 		}
-		if current.next == nil {
+		if cur.next == nil {
 			break
 		}
-		current = current.next
+		cur = cur.next
 	}
 }
 
-func (b *segment) optimize() {
-	cur := b
+// Optimize is responsible for finding segments that are causing byte compression gain to be negative, and try to
+// revert it.
+func (s *segment) Optimize() {
+	cur := s
 	modified := false
 	for {
 		if cur == nil {
 			if modified {
-				cur = b
+				cur = s
 				modified = false
 				continue
 			}
 			break
 		}
-		if cur.getCompressionGains() > 0 || cur.previous == nil {
+		if cur.GetCompressionGains() > 0 || cur.previous == nil {
 			cur = cur.next
 			continue
 		}
@@ -247,7 +212,7 @@ func (b *segment) optimize() {
 		for _, pos := range cur.pos {
 			// If we don't find the previous segment in any block, we can't optimize it,
 			// so we just go to the next optimizable segment.
-			prev := b.findSegmentByPos(pos - 1)
+			prev := s.FindSegment(pos - 1)
 			if prev == nil || prev.flags.getType() != typeUncompressed {
 				break
 			}
@@ -266,12 +231,13 @@ func (b *segment) optimize() {
 	}
 }
 
-func (b *segment) findSegmentByPos(pos uint32) *segment {
-	cur := b
+// FindSegment finds the segment that contains pos.
+func (s *segment) FindSegment(pos uint32) *segment {
+	cur := s
 	for {
 		for _, curPos := range cur.pos {
 			if curPos <= pos && curPos+uint32(cur.repeat)*uint32(len(cur.buffer)) > pos {
-				return b
+				return s
 			}
 		}
 		if cur.next == nil {

@@ -51,10 +51,24 @@ func Test_encoding(t *testing.T) {
 	// 	t.Fatalf("failed to read file: %s", err)
 	// }
 
-	block := compress(in, 2)
+	block := Compress(in, 2)
 	expectedSerialization := encode(block)
 	decoded, err := decode(expectedSerialization)
 	require.NoError(t, err)
+
+	t.Run("segment composition", func(t *testing.T) {
+		exp := [][]byte{
+			{0},
+			{1},
+			{2},
+		}
+
+		got := [][]byte{}
+		for i := range block.head {
+			got = append(got, block.head[i].buffer)
+		}
+		require.Equal(t, exp, got)
+	})
 
 	t.Run("decoding", func(t *testing.T) {
 		require.Equal(t, len(block.head), len(decoded.head))
@@ -85,7 +99,7 @@ func Test_encoding(t *testing.T) {
 	})
 
 	t.Run("reconstruction", func(t *testing.T) {
-		out := decompress(block)
+		out := Decompress(block)
 		require.Equal(t, in, out)
 	})
 }
@@ -101,7 +115,7 @@ func Test_bestMinSize(t *testing.T) {
 	var highestGain int64
 	bestGroupSize := -1
 	for groupSize := 2; groupSize < 30; groupSize++ {
-		block := compress(in, uint16(groupSize))
+		block := Compress(in, uint16(groupSize))
 		serialize := encode(block)
 		newSize := int64(len(serialize))
 		if newSize >= bestSize {
@@ -114,7 +128,7 @@ func Test_bestMinSize(t *testing.T) {
 			if entry.repeat > uint16(highestRepeat) {
 				highestRepeat = int(entry.repeat)
 			}
-			if gain := entry.getCompressionGains(); gain > highestGain {
+			if gain := entry.GetCompressionGains(); gain > highestGain {
 				highestGain = gain
 			}
 		}

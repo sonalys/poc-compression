@@ -1,6 +1,6 @@
 package gompressor
 
-func compress(in []byte, minSize uint16) *block {
+func Compress(in []byte, minSize uint16) *block {
 	if minSize == 1 {
 		panic("minSize should be greater than 1")
 	}
@@ -28,27 +28,23 @@ func compress(in []byte, minSize uint16) *block {
 		}
 		// avoid creating segments with nil buffer.
 		if index-prev > 0 {
-			cur = cur.add(newSegment(typeUncompressed, prev, 1, in[prev:index]))
+			cur = cur.Add(NewSegment(typeUncompressed, prev, 1, in[prev:index]))
 		}
-		cur = cur.add(newSegment(typeRepeat, index, repeatCount, []byte{in[index]}))
-		// prev -1 because the for iterator will add +1 again.
+		cur = cur.Add(NewSegment(typeRepeat, index, repeatCount, []byte{in[index]}))
 		index += uint32(repeatCount) - 1
-		// mark the next byte as the begin of the next unsegmented section.
-		prev = index
+		prev = index + 1
 	}
 	head = head.next
 	if head == nil {
-		head = newSegment(typeUncompressed, 0, 1, in)
+		head = NewSegment(typeUncompressed, 0, 1, in)
 	} else if lenIn-prev > 0 {
-		raw := newSegment(typeUncompressed, prev, 1, in[prev:])
-		cur.next = raw
-		raw.previous = cur
+		cur.Add(NewSegment(typeUncompressed, prev, 1, in[prev:]))
 	}
 
-	head.deduplicate()
+	head.Deduplicate()
 	// head.optimize()
 
-	b.head = getOrderedSegments(head)
+	b.head = GetOrderedSegments(head)
 
 	// for i := uint32(0); i < uint32(len(out)); i++ {
 	// 	localGroups := []repetitionGroup{}

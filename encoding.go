@@ -74,9 +74,8 @@ func encode(b *block) []byte {
 func decode(b []byte) (out *block, err error) {
 	var pos uint32
 	out = &block{
-		parsed: true,
-		size:   decoder.Uint32(b[0:]),
-		head:   make([]orderedSegment, 0),
+		size: decoder.Uint32(b[0:]),
+		head: make([]orderedSegment, 0),
 	}
 	pos += 4
 	var i uint8

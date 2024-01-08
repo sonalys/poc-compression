@@ -145,7 +145,7 @@ func Test_segment_addPos(t *testing.T) {
 				previous: tt.fields.previous,
 				next:     tt.fields.next,
 			}
-			got, err := s.addPos(tt.args.pos)
+			got, err := s.AddPos(tt.args.pos)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("segment.addPos() error = %v, wantErr %v", err, tt.wantErr)
 				return
