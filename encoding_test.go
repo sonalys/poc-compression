@@ -9,10 +9,10 @@ import (
 func Test_SegmentEncoding(t *testing.T) {
 	t.Run("uncompressed segment", func(t *testing.T) {
 		segment := Segment{
-			Metadata: meta(typeUncompressed),
-			Repeat:   1,
-			Buffer:   []byte{1, 2, 3},
-			Pos:      []uint32{1, 2, 3},
+			Type:   TypeUncompressed,
+			Repeat: 1,
+			Buffer: []byte{1, 2, 3},
+			Pos:    []uint32{1, 2, 3},
 		}
 		buffer := segment.Encode()
 
@@ -25,10 +25,10 @@ func Test_SegmentEncoding(t *testing.T) {
 
 	t.Run("repeat segment", func(t *testing.T) {
 		segment := Segment{
-			Metadata: meta(typeRepeat),
-			Repeat:   2,
-			Buffer:   []byte{1, 2, 3},
-			Pos:      []uint32{1, 2, 3},
+			Type:   TypeRepeat,
+			Repeat: 2,
+			Buffer: []byte{1, 2, 3},
+			Pos:    []uint32{1, 2, 3},
 		}
 
 		buffer := segment.Encode()

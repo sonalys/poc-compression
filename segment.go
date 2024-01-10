@@ -7,48 +7,34 @@ import (
 )
 
 type (
-	// My cats are still trying to reach to me about how to increase segments efficiency in disk, so stay tuned.
-
 	Block struct {
-		// Size of original buffer.
-		Size uint32
-		// Head of the dynamic list for buffer segments.
-		Head *Segment
-		// Buffer of all uncompressed data.
+		Size   uint32
+		Head   *Segment
 		Buffer []byte
 	}
 
-	// Segment
-	// memory serialization requires magic to avoid storing as much bytes as possible,
-	// while still being able to recover the struct and reconstruct the original buffer.
 	Segment struct {
-		// segment metadata.
-		Metadata meta
-		// Repeat indicates how many times buffer is repeated. that's not the same as pos.
-		// we are only storing this field in disk if the segment type is typeRepeat.
-		Repeat uint16
-		// Buffer can hold at maximum 4294967295 bytes, or 4.294967 gigabytes.
-		Buffer []byte
-
-		// No need to serialize the fields below on disk.
-		// Previous, Next elements in linked list.
+		Type           SegmentType
+		Repeat         uint16
+		Buffer         []byte
 		Previous, Next *Segment
-		// positions in which this segment repeats itself, max 32 positions.
-		Pos []uint32 // todo: no need to hold pos if there is only 1 value.
+		Pos            []uint32
 	}
 )
 
+// Decompress returns the segment to it's decompressed state.
 func (s *Segment) Decompress() []byte {
-	switch s.Metadata.getType() {
-	case typeUncompressed:
+	switch s.Type {
+	case TypeUncompressed:
 		return s.Buffer
-	case typeRepeat:
+	case TypeRepeat:
 		return bytes.Repeat(s.Buffer, int(s.Repeat))
 	default:
 		panic("invalid segment type")
 	}
 }
 
+// GetOriginalSize returns decompressed size for the segment.
 func (s *Segment) GetOriginalSize() int64 {
 	repeat := int64(s.Repeat)
 	bufLen := int64(len(s.Buffer))
@@ -64,8 +50,8 @@ func (s *Segment) GetCompressionGains() int64 {
 	originalSize := s.GetOriginalSize()
 	var compressedSize int64 = 5
 	// if segment is repeat, then +1 or +2 bytes.
-	if s.Metadata.getType() == typeRepeat {
-		if s.Metadata.isRepeat2Bytes() {
+	if s.Type == TypeRepeat {
+		if s.Repeat > math.MaxUint8 {
 			compressedSize += 2
 		} else {
 			compressedSize += 1
@@ -78,16 +64,15 @@ func (s *Segment) GetCompressionGains() int64 {
 }
 
 // NewSegment creates a new segment.
-func NewSegment(t segType, pos uint32, repeat uint16, buffer []byte) *Segment {
-	flags := meta(0)
-	flags = flags.setIsRepeat2Bytes(repeat > math.MaxUint8)
-	flags = flags.setPosLen(1)
-	flags = flags.setType(t)
+func NewSegment(t SegmentType, pos uint32, repeat uint16, buffer []byte) *Segment {
+	// flags := meta(0)
+	// flags = flags.setIsRepeat2Bytes(repeat > math.MaxUint8)
+	// flags = flags.setPosLen(1)
 	resp := &Segment{
-		Metadata: flags,
-		Repeat:   repeat,
-		Buffer:   buffer,
-		Pos:      []uint32{pos},
+		Type:   t,
+		Repeat: repeat,
+		Buffer: buffer,
+		Pos:    []uint32{pos},
 	}
 	return resp
 }
@@ -100,7 +85,6 @@ func (s *Segment) AddPos(pos []uint32) (*Segment, error) {
 		// TODO: add better handling for repeating groups.
 		return s, fmt.Errorf("len(pos) overflow")
 	}
-	s.Metadata = s.Metadata.setPosLen(uint8(newLen))
 	s.Pos = append(s.Pos, pos...)
 	return s, nil
 }
@@ -136,7 +120,7 @@ func (b *Block) Deduplicate() {
 			if iter = iter.Next; iter == nil {
 				break
 			}
-			if !bytes.Equal(cur.Buffer, iter.Buffer) || cur.Repeat != iter.Repeat || cur.Metadata.getType() != iter.Metadata.getType() {
+			if !bytes.Equal(cur.Buffer, iter.Buffer) || cur.Repeat != iter.Repeat || cur.Type != iter.Type {
 				continue
 			}
 			// if pos doesn't overflow, we continue with the merge operation.

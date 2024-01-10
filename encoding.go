@@ -1,6 +1,9 @@
 package gompressor
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"math"
+)
 
 var encoder = binary.BigEndian
 var decoder = binary.BigEndian
@@ -9,13 +12,14 @@ func (cur *Segment) Encode() []byte {
 	bufLen := uint32(len(cur.Buffer))
 	// allocate buffers.
 	posLen := uint8(len(cur.Pos))
-	cur.Metadata = cur.Metadata.setPosLen(posLen)
+	flag := meta(cur.Type)
+	flag = flag.setPosLen(posLen)
 	buffer := make([]byte, 0, 7+bufLen+uint32(posLen))
 	// start storing the binary.
-	buffer = append(buffer, byte(cur.Metadata))
+	buffer = append(buffer, byte(flag))
 	buffer = encoder.AppendUint32(buffer, bufLen)
-	if cur.Metadata.getType() == typeRepeat {
-		if cur.Metadata.isRepeat2Bytes() {
+	if cur.Type == TypeRepeat {
+		if cur.Repeat > math.MaxUint8 {
 			buffer = encoder.AppendUint16(buffer, cur.Repeat)
 		} else {
 			buffer = append(buffer, byte(cur.Repeat))
@@ -34,14 +38,14 @@ func DecodeSegment(b []byte) (*Segment, uint32) {
 	flag := meta(b[pos])
 	pos += 1
 	cur := Segment{
-		Metadata: flag,
-		Repeat:   1,
-		Pos:      make([]uint32, flag.getPosLen()),
+		Type:   flag.getType(),
+		Repeat: 1,
+		Pos:    make([]uint32, flag.getPosLen()),
 	}
 	bufLen := decoder.Uint32(b[pos:])
 	pos += 4
 	cur.Buffer = make([]byte, bufLen)
-	if flag.getType() == typeRepeat {
+	if flag.getType() == TypeRepeat {
 		if flag.isRepeat2Bytes() {
 			cur.Repeat = decoder.Uint16(b[pos:])
 			pos += 2

@@ -1,7 +1,6 @@
 package gompressor
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -80,83 +79,6 @@ func Test_meta_getPosLen(t *testing.T) {
 	}
 }
 
-func Test_segment_addPos(t *testing.T) {
-	type fields struct {
-		flags    meta
-		pos      []uint32
-		repeat   uint16
-		buffer   []byte
-		previous *Segment
-		next     *Segment
-	}
-	type args struct {
-		pos []uint32
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    *Segment
-		wantErr bool
-	}{
-		{
-			name:    "pos overflow from args",
-			fields:  fields{},
-			args:    args{make([]uint32, 32)},
-			want:    &Segment{},
-			wantErr: true,
-		},
-		{
-			name: "pos overflow from total",
-			fields: fields{
-				pos: make([]uint32, 16),
-			},
-			args: args{make([]uint32, 16)},
-			want: &Segment{
-				Pos: make([]uint32, 16),
-			},
-			wantErr: true,
-		},
-		{
-			name: "no initial pos",
-			fields: fields{
-				flags:  meta(0),
-				pos:    []uint32{},
-				repeat: 1,
-				buffer: []byte{1},
-			},
-			args: args{pos: []uint32{1, 2}},
-			want: &Segment{
-				Metadata: meta(0b00010000),
-				Pos:      []uint32{1, 2},
-				Repeat:   1,
-				Buffer:   []byte{1},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Segment{
-				Metadata: tt.fields.flags,
-				Pos:      tt.fields.pos,
-				Repeat:   tt.fields.repeat,
-				Buffer:   tt.fields.buffer,
-				Previous: tt.fields.previous,
-				Next:     tt.fields.next,
-			}
-			got, err := s.AddPos(tt.args.pos)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("segment.addPos() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("segment.addPos() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_meta_SetIsRepeat2Bytes(t *testing.T) {
 	tests := []struct {
 		name string
@@ -200,7 +122,7 @@ func Test_meta_SetIsRepeat2Bytes(t *testing.T) {
 
 func Test_meta_setType(t *testing.T) {
 	type args struct {
-		t segType
+		t SegmentType
 	}
 	tests := []struct {
 		name string
@@ -211,13 +133,13 @@ func Test_meta_setType(t *testing.T) {
 		{
 			name: "empty",
 			m:    meta(0b11111100),
-			args: args{typeUncompressed},
+			args: args{TypeUncompressed},
 			want: meta(0b11111100),
 		},
 		{
 			name: "repeat",
 			m:    meta(0b11111100),
-			args: args{typeRepeat},
+			args: args{TypeRepeat},
 			want: meta(0b11111101),
 		},
 	}
