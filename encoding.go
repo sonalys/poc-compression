@@ -89,7 +89,7 @@ func Decode(b []byte) (out *Block, err error) {
 			break
 		}
 		decoded, offset := DecodeSegment(b[pos:])
-		cur = cur.Add(decoded)
+		cur = cur.Append(decoded)
 		pos += offset
 	}
 	// Fix head.

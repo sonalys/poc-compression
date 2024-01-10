@@ -32,9 +32,9 @@ func Compress(in []byte) *Block {
 		}
 		// avoid creating segments with nil buffer.
 		if index-prev > 0 {
-			cur = cur.Add(NewSegment(TypeUncompressed, prev, 1, in[prev:index]))
+			cur = cur.Append(NewSegment(TypeUncompressed, prev, 1, in[prev:index]))
 		}
-		cur = cur.Add(NewSegment(TypeRepeat, index, repeatCount, []byte{in[index]}))
+		cur = cur.Append(NewSegment(TypeRepeat, index, repeatCount, []byte{in[index]}))
 		index += uint32(repeatCount) - 1
 		prev = index + 1
 	}
@@ -43,7 +43,7 @@ func Compress(in []byte) *Block {
 	if b.Head == nil {
 		b.Head = NewSegment(TypeUncompressed, 0, 1, in)
 	} else if lenIn-prev > 0 {
-		cur.Add(NewSegment(TypeUncompressed, prev, 1, in[prev:]))
+		cur.Append(NewSegment(TypeUncompressed, prev, 1, in[prev:]))
 	}
 
 	b.Deduplicate()
