@@ -2,19 +2,22 @@ package gompressor
 
 import "math"
 
-func Compress(in []byte) *block {
+// TODO: Test bloom-filters for regenerating a byte dictionary
+// try to create 2 or 3 filters, multiplying by prime numbers to get more precision.
+
+func Compress(in []byte) *Block {
 	if len(in) > math.MaxUint32 {
 		panic("input is over 4294967295 bytes long")
 	}
 	lenIn := uint32(len(in))
-	b := block{
+	b := Block{
 		Size: lenIn,
+		Head: &Segment{},
 	}
 	// prev is a cursor to the last position before a repeating group
 	var prev uint32
-	head := &Segment{}
 	// cur is a cursor to the head of the block's segments.
-	cur := head
+	cur := b.Head
 	// finds repetition groups and store them.
 	for index := uint32(0); index < lenIn; index++ {
 		repeatCount := uint16(1)
@@ -35,16 +38,15 @@ func Compress(in []byte) *block {
 		index += uint32(repeatCount) - 1
 		prev = index + 1
 	}
-	head = head.Next
-	if head == nil {
-		head = NewSegment(typeUncompressed, 0, 1, in)
+	// Fix head.
+	b.Remove(b.Head)
+	if b.Head == nil {
+		b.Head = NewSegment(typeUncompressed, 0, 1, in)
 	} else if lenIn-prev > 0 {
 		cur.Add(NewSegment(typeUncompressed, prev, 1, in[prev:]))
 	}
 
-	head.Deduplicate()
-	head.Optimize()
-
-	b.Segments = GetOrderedSegments(head)
+	b.Deduplicate()
+	b.Optimize()
 	return &b
 }

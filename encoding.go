@@ -5,12 +5,12 @@ import "encoding/binary"
 var encoder = binary.BigEndian
 var decoder = binary.BigEndian
 
-func (cur DiskSegment) Encode() []byte {
+func (cur *Segment) Encode() []byte {
 	bufLen := uint32(len(cur.Buffer))
 	// allocate buffers.
-	orderLen := uint8(len(cur.Order))
-	cur.Metadata = cur.Metadata.setPosLen(orderLen)
-	buffer := make([]byte, 0, 7+bufLen+uint32(orderLen))
+	posLen := uint8(len(cur.Pos))
+	cur.Metadata = cur.Metadata.setPosLen(posLen)
+	buffer := make([]byte, 0, 7+bufLen+uint32(posLen))
 	// start storing the binary.
 	buffer = append(buffer, byte(cur.Metadata))
 	buffer = encoder.AppendUint32(buffer, bufLen)
@@ -22,23 +22,21 @@ func (cur DiskSegment) Encode() []byte {
 		}
 	}
 	// we don't need to store the first position, since our decompression logic doesn't use it.
-	for i := range cur.Order {
-		buffer = encoder.AppendUint16(buffer, cur.Order[i])
+	for i := range cur.Pos {
+		buffer = encoder.AppendUint32(buffer, cur.Pos[i])
 	}
 	buffer = append(buffer, cur.Buffer...)
 	return buffer
 }
 
-func DecodeSegment(b []byte) (DiskSegment, uint32) {
+func DecodeSegment(b []byte) (*Segment, uint32) {
 	var pos uint32
 	flag := meta(b[pos])
 	pos += 1
-	cur := DiskSegment{
-		Segment: &Segment{
-			Metadata: flag,
-			Repeat:   1,
-		},
-		Order: make([]uint16, flag.getPosLen()),
+	cur := Segment{
+		Metadata: flag,
+		Repeat:   1,
+		Pos:      make([]uint32, flag.getPosLen()),
 	}
 	bufLen := decoder.Uint32(b[pos:])
 	pos += 4
@@ -52,44 +50,45 @@ func DecodeSegment(b []byte) (DiskSegment, uint32) {
 			pos += 1
 		}
 	}
-	for i := range cur.Order {
-		cur.Order[i] = decoder.Uint16(b[pos:])
-		pos += 2
+	for i := range cur.Pos {
+		cur.Pos[i] = decoder.Uint32(b[pos:])
+		pos += 4
 	}
 	cur.Buffer = b[pos : pos+bufLen]
-	return cur, pos + bufLen
+	return &cur, pos + bufLen
 }
 
-func Encode(b *block) []byte {
-	buffer := make([]byte, 0, b.Size)
+func Encode(b *Block) []byte {
+	out := make([]byte, 0, 8+len(b.Buffer))
 	// Store original size of the buffer.
-	buffer = encoder.AppendUint32(buffer, b.Size)
-	// Iterate from head to tail of segments.
-	for _, entry := range b.Segments {
-		buffer = append(buffer, entry.Encode()...)
-	}
-	return buffer
+	out = encoder.AppendUint32(out, b.Size)
+	out = encoder.AppendUint32(out, uint32(len(b.Buffer)))
+	out = append(out, b.Buffer...)
+	b.ForEach(func(s *Segment) {
+		out = append(out, s.Encode()...)
+	})
+	return out
 }
 
-func Decode(b []byte) (out *block, err error) {
+func Decode(b []byte) (out *Block, err error) {
 	var pos uint32
-	out = &block{
-		Size:     decoder.Uint32(b[0:]),
-		Segments: make([]DiskSegment, 0),
+	out = &Block{
+		Size: decoder.Uint32(b[0:]),
+		Head: &Segment{},
 	}
-	pos += 4
-	var i uint8
+	pos += 8
+	out.Buffer = b[pos : pos+decoder.Uint32(b[4:])]
+	pos += uint32(len(out.Buffer))
+	cur := out.Head
 	for {
 		if pos == uint32(len(b)) {
 			break
 		}
-		cur, offset := DecodeSegment(b[pos:])
-		out.Segments = append(out.Segments, cur)
+		decoded, offset := DecodeSegment(b[pos:])
+		cur = cur.Add(decoded)
 		pos += offset
-		i++
-		if i == 0 {
-			panic("segment overflow")
-		}
 	}
+	// Fix head.
+	out.Remove(out.Head)
 	return
 }

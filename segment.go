@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"sort"
 )
 
 type (
 	// My cats are still trying to reach to me about how to increase segments efficiency in disk, so stay tuned.
 
-	block struct {
-		Size     uint32
-		Segments []DiskSegment
+	Block struct {
+		// Size of original buffer.
+		Size uint32
+		// Head of the dynamic list for buffer segments.
+		Head *Segment
+		// Buffer of all uncompressed data.
+		Buffer []byte
 	}
 
 	// Segment
@@ -32,15 +35,6 @@ type (
 		Previous, Next *Segment
 		// positions in which this segment repeats itself, max 32 positions.
 		Pos []uint32 // todo: no need to hold pos if there is only 1 value.
-	}
-
-	DiskSegment struct {
-		*Segment
-
-		// Order represents in which Order this segment should be executed on decode.
-		// max 255 segments per block.
-		// TODO: maybe allow dynamic sizing here as well.
-		Order []uint16
 	}
 )
 
@@ -77,63 +71,10 @@ func (s *Segment) GetCompressionGains() int64 {
 			compressedSize += 1
 		}
 	}
-	compressedSize += posLen * 2
+	compressedSize += posLen * 4
 	compressedSize += bufLen
 	gain := originalSize - compressedSize
 	return gain
-}
-
-// GetOrderedSegments will convert a Segment into an OrderedSegment,
-// we do this to map pos, which occupies 4 bytes, to order, which is uses 1 byte.
-func GetOrderedSegments(head *Segment) []DiskSegment {
-	// segmentProjection is a projection abstraction to convert uint32 system coordinate to uint8.
-	// we can run this optimization because we don't care about segment position in final buffer,
-	// we only care about in which order they are decompressed.
-	type segmentProjection struct {
-		pos     uint32
-		order   uint16
-		segment *DiskSegment
-	}
-	var projections []segmentProjection
-	var segList []*DiskSegment
-	cur := head
-	for {
-		curSegment := &DiskSegment{
-			Segment: cur,
-		}
-		segList = append(segList, curSegment)
-		for _, pos := range cur.Pos {
-			projections = append(projections, segmentProjection{
-				pos:     pos,
-				segment: curSegment,
-			})
-		}
-		if cur.Next == nil {
-			break
-		}
-		cur = cur.Next
-	}
-	sort.Slice(projections, func(i, j int) bool {
-		return projections[i].pos < projections[j].pos
-	})
-	// add a crescent order for all segments. example: 0,1,2,3.
-	for i := 1; i < len(projections); i++ {
-		order := projections[i-1].order + 1
-		if order == 0 {
-			panic("segment count overflow")
-		}
-		projections[i].order = order
-	}
-	// all projections link to their respective segments, so the same segment can have many projections.
-	for _, entry := range projections {
-		entry.segment.Order = append(entry.segment.Order, entry.order)
-	}
-	// here we are simply converting the projection back to an orderedSegment.
-	finalList := make([]DiskSegment, 0, len(segList))
-	for i := range segList {
-		finalList = append(finalList, *segList[i])
-	}
-	return finalList
 }
 
 // NewSegment creates a new segment.
@@ -172,8 +113,10 @@ func (s *Segment) Add(next *Segment) *Segment {
 }
 
 // Remove dereferences this segment from the linked list.
-func (s *Segment) Remove() {
-	if s.Previous != nil {
+func (b *Block) Remove(s *Segment) {
+	if s.Previous == nil {
+		b.Head = s.Next
+	} else {
 		s.Previous.Next = s.Next
 	}
 	if s.Next != nil {
@@ -182,9 +125,12 @@ func (s *Segment) Remove() {
 }
 
 // Deduplicate will find segments that are identical, besides position, and merge them.
-func (s *Segment) Deduplicate() {
-	cur := s
+func (b *Block) Deduplicate() {
+	cur := b.Head
 	for {
+		if cur == nil {
+			break
+		}
 		iter := cur
 		for {
 			if iter = iter.Next; iter == nil {
@@ -195,72 +141,47 @@ func (s *Segment) Deduplicate() {
 			}
 			// if pos doesn't overflow, we continue with the merge operation.
 			if _, err := cur.AddPos(iter.Pos); err == nil {
-				iter.Remove()
+				b.Remove(iter)
 			}
-		}
-		if cur.Next == nil {
-			break
 		}
 		cur = cur.Next
 	}
 }
 
-// IsMergeable returns true if the segment can be merged with another.
-// TODO: maybe improve this logic, and receive another segment s2,
-// Calculate if they are always together relative to each other, but might not be worth the effort.
-func (s *Segment) IsMergeable() bool {
-	// For a segment to be mergeable, you need for it to only appear once,
-	// be uncompressed, and without repetitions.
-	// Otherwise you might merge segments of different repeats and positions, and distort the final data.
-	return len(s.Pos) == 1 && s.Repeat == 1 && s.Metadata.getType() == typeUncompressed
-}
-
 // Optimize is responsible for finding segments that are causing byte compression gain to be negative, and try to
 // revert it.
-func (s *Segment) Optimize() {
-	cur := s
+func (b *Block) Optimize() {
+	cur := b.Head
+	// For making the logic easier on the POC, we just use this slice to sort by position.
+	segMap := make([]*SegmentPosMap, b.Size)
 	for {
 		if cur == nil {
 			break
 		}
-		if cur.GetCompressionGains() > 0 || cur.Previous == nil {
-			cur = cur.Next
-			continue
-		}
-		type previousNextMap struct {
-			prev, next *Segment
-		}
-		mergeable := make([]previousNextMap, 0, len(cur.Pos))
-		for _, pos := range cur.Pos {
-			if sibling, found := s.FindSegment(pos - 1); found && sibling.IsMergeable() {
-				mergeable = append(mergeable, previousNextMap{
-					prev: sibling,
-				})
-				continue
-			}
-			if sibling, found := s.FindSegment(pos + uint32(len(cur.Buffer))); found && sibling.IsMergeable() {
-				mergeable = append(mergeable, previousNextMap{
-					next: sibling,
-				})
-			}
-		}
-		// Check if all possible positions are mergeable.
-		if len(mergeable) == len(cur.Pos) {
-			for _, entry := range mergeable {
-				buf := bytes.Repeat(cur.Buffer, int(cur.Repeat))
-				if entry.prev != nil {
-					entry.prev.Buffer = append(entry.prev.Buffer, buf...)
-					continue
-				}
-				if entry.next != nil {
-					// since we are tweaking the beginning of the buffer, we have to update position.
-					entry.next.Pos[0] -= uint32(len(buf))
-					entry.next.Buffer = append(buf, entry.next.Buffer...)
+		// If we are not gaining any delta size, we just move it to the uncompressed buffer.
+		if cur.GetCompressionGains() <= 0 {
+			for _, pos := range cur.Pos {
+				segMap[pos] = &SegmentPosMap{
+					Pos:     pos,
+					Segment: cur,
 				}
 			}
-			cur.Remove()
+			b.Remove(cur)
 		}
 		cur = cur.Next
+	}
+
+	for _, entry := range segMap {
+		if entry == nil {
+			continue
+		}
+		cur, pos := entry.Segment, entry.Pos
+		segBuf := cur.Decompress()
+		bufLen := uint32(len(b.Buffer))
+		if pos < bufLen {
+			panic("buffer optimization should be linear")
+		}
+		b.Buffer = append(b.Buffer, segBuf...)
 	}
 }
 
@@ -279,4 +200,15 @@ func (s *Segment) FindSegment(pos uint32) (*Segment, bool) {
 		cur = cur.Next
 	}
 	return nil, false
+}
+
+func (b *Block) ForEach(f func(*Segment)) {
+	cur := b.Head
+	for {
+		if cur == nil {
+			break
+		}
+		f(cur)
+		cur = cur.Next
+	}
 }
