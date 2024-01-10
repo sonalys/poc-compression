@@ -68,7 +68,7 @@ func Encode(b *Block) []byte {
 	out = encoder.AppendUint32(out, b.Size)
 	out = encoder.AppendUint32(out, uint32(len(b.Buffer)))
 	out = append(out, b.Buffer...)
-	b.ForEach(func(s *Segment) {
+	b.Head.ForEach(func(s *Segment) {
 		out = append(out, s.Encode()...)
 	})
 	return out

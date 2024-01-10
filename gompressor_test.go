@@ -82,13 +82,11 @@ func Test_bestMinSize(t *testing.T) {
 	// stats := CountRepetitions(in)
 	// t.Logf("%v", stats)
 	var segmentCount int
-	var highestRepeat int
-	var minSize int = math.MaxInt
-	var highestGain, highestLoss int64 = 0, math.MaxInt64
+	var minRepeat, maxRepeat int = math.MaxInt, 0
+	var minGain, maxGain int64 = math.MaxInt64, 0
 	block := Compress(in)
 	serialize := Encode(block)
-	newSize := int64(len(serialize))
-	// segmentCount = len(block.Segments)
+	compressedSize := int64(len(serialize))
 
 	out := Decompress(block)
 	require.Equal(t, len(in), len(out), "input and output are different")
@@ -99,29 +97,38 @@ func Test_bestMinSize(t *testing.T) {
 		}
 	}
 
-	block.ForEach(func(entry *Segment) {
-		if entry.Repeat > uint16(highestRepeat) {
-			highestRepeat = int(entry.Repeat)
+	block.Head.ForEach(func(entry *Segment) {
+		segmentCount++
+		if repeat := int(entry.Repeat); repeat > maxRepeat {
+			maxRepeat = repeat
+		} else if repeat < minRepeat {
+			minRepeat = repeat
 		}
-		if size := int(entry.Repeat); size < minSize {
-			minSize = size
-		}
-		if gain := entry.GetCompressionGains(); gain > highestGain {
-			highestGain = gain
-		} else if gain < highestLoss {
-			highestLoss = gain
+		if gain := entry.GetCompressionGains(); gain > maxGain {
+			maxGain = gain
+		} else if gain < minGain {
+			minGain = gain
 		}
 	})
 
-	ratio := float64(newSize) / float64(len(in))
+	ratio := float64(compressedSize) / float64(len(in))
 	t.Logf(`
 byte ratio				%.2f (%d / %d)
 compressed: 			%d bytes
 segments count: 	%d
-highest repeat: 	%d
-highest delta: 		%d bytes
-smallest delta: 	%d bytes
-min size: 				%d bytes
+min repeat: 			%d
+max repeat:			 	%d
+min gain:				 	%d bytes
+max gain: 				%d bytes
 `,
-		ratio, newSize, int64(len(in)), int64(len(in))-newSize, segmentCount, highestRepeat, highestGain, highestLoss, minSize)
+		ratio,
+		compressedSize,
+		int64(len(in)),
+		int64(len(in))-compressedSize,
+		segmentCount,
+		minRepeat,
+		maxRepeat,
+		minGain,
+		maxGain,
+	)
 }

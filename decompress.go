@@ -7,7 +7,7 @@ type SegmentPosMap struct {
 
 func sortSegmentsByPos(b *Block) []*SegmentPosMap {
 	segMap := make([]*SegmentPosMap, b.Size)
-	b.ForEach(func(s *Segment) {
+	b.Head.ForEach(func(s *Segment) {
 		for _, pos := range s.Pos {
 			segMap[pos] = &SegmentPosMap{
 				Pos:     pos,
