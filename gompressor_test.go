@@ -83,6 +83,7 @@ func Test_bestMinSize(t *testing.T) {
 	// t.Logf("%v", stats)
 	var segmentCount int
 	var highestRepeat int
+	var minSize int = math.MaxInt
 	var highestGain, highestLoss int64 = 0, math.MaxInt64
 	block := Compress(in)
 	serialize := Encode(block)
@@ -102,6 +103,9 @@ func Test_bestMinSize(t *testing.T) {
 		if entry.Repeat > uint16(highestRepeat) {
 			highestRepeat = int(entry.Repeat)
 		}
+		if size := int(entry.Repeat); size < minSize {
+			minSize = size
+		}
 		if gain := entry.GetCompressionGains(); gain > highestGain {
 			highestGain = gain
 		} else if gain < highestLoss {
@@ -116,7 +120,8 @@ compressed: 			%d bytes
 segments count: 	%d
 highest repeat: 	%d
 highest delta: 		%d bytes
-smallest delta: 		%d bytes
+smallest delta: 	%d bytes
+min size: 				%d bytes
 `,
-		ratio, newSize, int64(len(in)), int64(len(in))-newSize, segmentCount, highestRepeat, highestGain, highestLoss)
+		ratio, newSize, int64(len(in)), int64(len(in))-newSize, segmentCount, highestRepeat, highestGain, highestLoss, minSize)
 }

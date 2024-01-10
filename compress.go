@@ -27,7 +27,7 @@ func Compress(in []byte) *Block {
 				panic("repeat overflow")
 			}
 		}
-		if repeatCount < 5 {
+		if repeatCount < 2 {
 			continue
 		}
 		// avoid creating segments with nil buffer.
