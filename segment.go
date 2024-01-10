@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"sort"
 )
 
 type (
@@ -127,24 +128,24 @@ func (b *Block) Deduplicate() {
 // revert it.
 func (b *Block) Optimize() {
 	// For making the logic easier on the POC, we just use this slice to sort by position.
-	orderedSegments := make([]*SegmentPosMap, b.Size)
+	orderedSegments := make([]SegmentPosMap, 0, b.Size)
 	// If we are not gaining any delta size, we just move it to the uncompressed buffer.
 	b.Head.ForEach(func(cur *Segment) {
 		if cur.GetCompressionGains() > 0 {
 			return
 		}
 		for _, pos := range cur.Pos {
-			orderedSegments[pos] = &SegmentPosMap{
+			orderedSegments = append(orderedSegments, SegmentPosMap{
 				Pos:     pos,
 				Segment: cur,
-			}
+			})
 		}
 		b.Remove(cur)
 	})
+	sort.Slice(orderedSegments, func(i, j int) bool {
+		return orderedSegments[i].Pos < orderedSegments[j].Pos
+	})
 	for _, entry := range orderedSegments {
-		if entry == nil {
-			continue
-		}
 		cur, pos := entry.Segment, entry.Pos
 		segBuf := cur.Decompress()
 		bufLen := uint32(len(b.Buffer))

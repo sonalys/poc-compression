@@ -1,38 +1,32 @@
 package gompressor
 
+import "sort"
+
 type SegmentPosMap struct {
 	Pos uint32
 	*Segment
 }
 
-func sortSegmentsByPos(b *Block) []*SegmentPosMap {
-	segMap := make([]*SegmentPosMap, b.Size)
+func sortSegments(b *Block) []SegmentPosMap {
+	out := make([]SegmentPosMap, 0, b.Size)
 	b.Head.ForEach(func(s *Segment) {
 		for _, pos := range s.Pos {
-			segMap[pos] = &SegmentPosMap{
+			out = append(out, SegmentPosMap{
 				Pos:     pos,
 				Segment: s,
-			}
+			})
 		}
 	})
-	sortedSegments := make([]*SegmentPosMap, 0, b.Size)
-	for i := range segMap {
-		if segMap[i] == nil {
-			continue
-		}
-		sortedSegments = append(sortedSegments, segMap[i])
-	}
-	return sortedSegments
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Pos < out[j].Pos
+	})
+	return out
 }
 
 func Decompress(b *Block) []byte {
 	out := make([]byte, b.Size)
-	segments := sortSegmentsByPos(b)
-	if len(segments) == 0 {
-		return b.Buffer
-	}
 	copy(out, b.Buffer)
-	for _, cur := range segments {
+	for _, cur := range sortSegments(b) {
 		buf := cur.Decompress()
 		lenBuf := uint32(len(buf))
 		// right-shift data.
