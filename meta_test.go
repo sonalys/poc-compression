@@ -139,7 +139,7 @@ func Test_meta_setType(t *testing.T) {
 		{
 			name: "repeat",
 			m:    meta(0b11111100),
-			args: args{TypeRepeat},
+			args: args{TypeRepeatSameChar},
 			want: meta(0b11111101),
 		},
 	}

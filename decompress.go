@@ -7,9 +7,9 @@ type SegmentPosMap struct {
 	*Segment
 }
 
-func sortSegments(b *Block) []SegmentPosMap {
-	out := make([]SegmentPosMap, 0, b.Size)
-	b.Head.ForEach(func(s *Segment) {
+func sortSegments(head *Segment) []SegmentPosMap {
+	out := make([]SegmentPosMap, 0, 500)
+	head.ForEach(func(s *Segment) {
 		for _, pos := range s.Pos {
 			out = append(out, SegmentPosMap{
 				Pos:     pos,
@@ -18,6 +18,10 @@ func sortSegments(b *Block) []SegmentPosMap {
 		}
 	})
 	sort.Slice(out, func(i, j int) bool {
+		// We layer the logic by segment type, so some segments should decompress first than others.
+		if out[i].Type != out[j].Type {
+			return out[i].Type < out[j].Type
+		}
 		return out[i].Pos < out[j].Pos
 	})
 	return out
@@ -26,7 +30,7 @@ func sortSegments(b *Block) []SegmentPosMap {
 func Decompress(b *Block) []byte {
 	out := make([]byte, b.Size)
 	copy(out, b.Buffer)
-	for _, cur := range sortSegments(b) {
+	for _, cur := range sortSegments(b.Head) {
 		buf := cur.Decompress()
 		lenBuf := uint32(len(buf))
 		// right-shift data.

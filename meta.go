@@ -10,8 +10,9 @@ type meta uint8
 type SegmentType uint8
 
 const (
-	TypeUncompressed SegmentType = 0b0
-	TypeRepeat       SegmentType = 0b1
+	TypeUncompressed SegmentType = iota
+	TypeRepeatingGroup
+	TypeRepeatSameChar
 
 	flagRepeatIs2Bytes meta = 0b1 << 2
 )

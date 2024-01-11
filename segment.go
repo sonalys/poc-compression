@@ -17,9 +17,9 @@ type Segment struct {
 // Decompress returns the segment to it's decompressed state.
 func (s *Segment) Decompress() []byte {
 	switch s.Type {
-	case TypeUncompressed:
+	case TypeUncompressed, TypeRepeatingGroup:
 		return s.Buffer
-	case TypeRepeat:
+	case TypeRepeatSameChar:
 		return bytes.Repeat(s.Buffer, int(s.Repeat))
 	default:
 		panic("invalid segment type")
@@ -42,7 +42,7 @@ func (s *Segment) GetCompressionGains() int64 {
 	originalSize := s.GetOriginalSize()
 	var compressedSize int64 = 5
 	// if segment is repeat, then +1 or +2 bytes.
-	if s.Type == TypeRepeat {
+	if s.Type == TypeRepeatSameChar {
 		if s.Repeat > math.MaxUint8 {
 			compressedSize += 2
 		} else {
@@ -83,7 +83,28 @@ func (s *Segment) AddPos(pos []uint32) (*Segment, error) {
 
 // Append adds a segment after the current.
 func (s *Segment) Append(next *Segment) *Segment {
+	// Finds the tail of the next segment chain.
+	cur := next
+	for {
+		if cur.Next == nil {
+			break
+		}
+		cur = cur.Next
+	}
+	// Merges the two segment chains.
+	cur.Next = s.Next
 	s.Next = next
 	next.Previous = s
 	return next
+}
+
+func (s *Segment) Tail() *Segment {
+	cur := s
+	for {
+		if cur.Next == nil {
+			break
+		}
+		cur = cur.Next
+	}
+	return cur
 }

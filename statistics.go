@@ -26,7 +26,7 @@ func CountRepetitions(in []byte) (repetition []map[int]uint) {
 	return
 }
 
-func calculateSmallestDelta(input []byte, offset uint32, windowSize uint32) (uint32, float64) {
+func CalculateSmallestDelta(input []byte, offset uint32, windowSize uint32) (uint32, float64) {
 	inputLen := uint32(len(input))
 
 	var resp float64 = math.MaxFloat64
@@ -48,4 +48,14 @@ func calculateSmallestDelta(input []byte, offset uint32, windowSize uint32) (uin
 		}
 	}
 	return pos, resp
+}
+
+func MapBytePos(in []byte) (repetition [256][]uint32) {
+	for pos, char := range in {
+		if repetition[char] == nil {
+			repetition[char] = make([]uint32, 0, 100)
+		}
+		repetition[char] = append(repetition[char], uint32(pos))
+	}
+	return
 }

@@ -9,7 +9,7 @@ import (
 func Test_GetCompressionGain(t *testing.T) {
 	t.Run("positive gain", func(t *testing.T) {
 		seg := &Segment{
-			Type:   TypeRepeat,
+			Type:   TypeRepeatSameChar,
 			Repeat: 50,
 			Buffer: []byte{1, 2},
 			Pos:    []uint32{0, 100},

@@ -30,7 +30,7 @@ func Test_averageByteShift(t *testing.T) {
 	var bestWindow, bestPos uint32
 
 	for windowSize := uint32(100); windowSize > 9; windowSize-- {
-		pos, got := calculateSmallestDelta(in, 0, windowSize)
+		pos, got := CalculateSmallestDelta(in, 0, windowSize)
 		if got < smallestByteShift {
 			smallestByteShift = got
 			bestWindow = windowSize

@@ -18,7 +18,7 @@ func (cur *Segment) Encode() []byte {
 	// start storing the binary.
 	buffer = append(buffer, byte(flag))
 	buffer = encoder.AppendUint32(buffer, bufLen)
-	if cur.Type == TypeRepeat {
+	if cur.Type == TypeRepeatSameChar {
 		if cur.Repeat > math.MaxUint8 {
 			buffer = encoder.AppendUint16(buffer, cur.Repeat)
 		} else {
@@ -45,7 +45,7 @@ func DecodeSegment(b []byte) (*Segment, uint32) {
 	bufLen := decoder.Uint32(b[pos:])
 	pos += 4
 	cur.Buffer = make([]byte, bufLen)
-	if flag.getType() == TypeRepeat {
+	if flag.getType() == TypeRepeatSameChar {
 		if flag.isRepeat2Bytes() {
 			cur.Repeat = decoder.Uint16(b[pos:])
 			pos += 2

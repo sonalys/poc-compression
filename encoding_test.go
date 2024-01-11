@@ -25,7 +25,7 @@ func Test_SegmentEncoding(t *testing.T) {
 
 	t.Run("repeat segment", func(t *testing.T) {
 		segment := Segment{
-			Type:   TypeRepeat,
+			Type:   TypeRepeatSameChar,
 			Repeat: 2,
 			Buffer: []byte{1, 2, 3},
 			Pos:    []uint32{1, 2, 3},
