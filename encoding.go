@@ -12,11 +12,9 @@ func (cur *Segment) Encode() []byte {
 	bufLen := uint32(len(cur.Buffer))
 	// allocate buffers.
 	posLen := uint8(len(cur.Pos))
-	flag := meta(cur.Type)
-	flag = flag.setPosLen(posLen)
 	buffer := make([]byte, 0, 7+bufLen+uint32(posLen))
 	// start storing the binary.
-	buffer = append(buffer, byte(flag))
+	buffer = append(buffer, byte(NewMetadata(cur.Type, posLen, cur.Repeat > math.MaxUint8)))
 	buffer = encoder.AppendUint32(buffer, bufLen)
 	if cur.Type == TypeRepeatSameChar {
 		if cur.Repeat > math.MaxUint8 {

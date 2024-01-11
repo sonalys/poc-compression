@@ -4,7 +4,7 @@ package gompressor
 // Address	|		data
 //
 //	1, 2					Segment types = max 4.
-//	3							Repeat size, 0 = 1 byte, 1 = 2 bytes.
+//	3*						If type Repeat, 0 = 1 byte, 1 = 2 bytes for seg.Repeat.
 //	4,5,6,7,8			posLen = max 32.
 type meta uint8
 type SegmentType uint8
@@ -15,7 +15,16 @@ const (
 	TypeRepeatSameChar
 
 	flagRepeatIs2Bytes meta = 0b1 << 2
+
+	maxSegmentPos int = 0b11111
 )
+
+func NewMetadata(t SegmentType, posLen uint8, repeatSize bool) meta {
+	resp := meta(t)
+	resp = resp.setPosLen(posLen)
+	resp = resp.setIsRepeat2Bytes(repeatSize)
+	return resp
+}
 
 // setPosLen
 // 1. clears the last 5 bytes

@@ -56,9 +56,6 @@ func (s *Segment) GetCompressionGains() int64 {
 
 // NewSegment creates a new segment.
 func NewSegment(t SegmentType, pos uint32, repeat uint16, buffer []byte) *Segment {
-	// flags := meta(0)
-	// flags = flags.setIsRepeat2Bytes(repeat > math.MaxUint8)
-	// flags = flags.setPosLen(1)
 	resp := &Segment{
 		Type:   t,
 		Repeat: repeat,
@@ -81,8 +78,7 @@ func (s *Segment) RemovePos(pos uint32) {
 // it will return error if it overflows the maximum capacity of the segment.
 func (s *Segment) AddPos(pos []uint32) (*Segment, error) {
 	newLen := len(s.Pos) + len(pos)
-	if newLen > 0b11111 {
-		// TODO: add better handling for repeating groups.
+	if newLen > maxSegmentPos {
 		return s, fmt.Errorf("len(pos) overflow")
 	}
 	s.Pos = append(s.Pos, pos...)

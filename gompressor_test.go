@@ -75,8 +75,8 @@ func Test_encoding(t *testing.T) {
 
 func Test_bestMinSize(t *testing.T) {
 	const path string = "" +
-		// "/bin/zsh"
-		"/storage/DJI_0003.MP4"
+		"/bin/zsh"
+		// "/storage/DJI_0003.MP4"
 		// "/home/raicon/Pictures/Screenshot_20240105_145006.png"
 	in, err := os.ReadFile(path)
 	if err != nil {
