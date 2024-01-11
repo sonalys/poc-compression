@@ -13,8 +13,8 @@ func Compress(in []byte) *Block {
 	//out, tail := CreateSameCharSegments(in)
 	// head.Tail().Append(tail)
 	head := CreateRepeatingSegments(in)
-	head.Deduplicate()
-	uncompressedBuffer := head.RemoveNegativeSegments(size)
+	head = head.Deduplicate()
+	head, uncompressedBuffer := head.RevertBadSegments(size)
 	return &Block{
 		Size:   size,
 		Head:   head,

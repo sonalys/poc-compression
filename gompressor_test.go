@@ -79,6 +79,7 @@ func Test_bestMinSize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
+	// in = in[:100]
 	// stats := CountRepetitions(in)
 	// t.Logf("%v", stats)
 	var segmentCount int

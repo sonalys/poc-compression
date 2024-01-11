@@ -1,10 +1,16 @@
 package gompressor
 
-// RemoveNegativeSegments is responsible for finding segments that are causing byte compression gain to be negative, and try to
-// revert it.
-func (s *Segment) RemoveNegativeSegments(size uint32) []byte {
+// RevertBadSegments is responsible for reverting bad segments.
+func (s *Segment) RevertBadSegments(size uint32) (*Segment, []byte) {
 	orderedSegments := sortAndFilterSegments(s, func(cur *Segment) bool {
-		return cur.GetCompressionGains() <= 0
+		if cur.GetCompressionGains() <= 0 {
+			next := cur.Remove()
+			if s == cur {
+				s = next
+			}
+			return true
+		}
+		return false
 	})
 	out := make([]byte, 0, size)
 	for _, entry := range orderedSegments {
@@ -14,7 +20,6 @@ func (s *Segment) RemoveNegativeSegments(size uint32) []byte {
 			panic("reconstruction should be linear")
 		}
 		out = append(out, cur.Decompress()...)
-		cur.Remove()
 	}
-	return out
+	return s, out
 }

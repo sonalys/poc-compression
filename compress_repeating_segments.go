@@ -8,22 +8,22 @@ func CreateRepeatingSegments(buf []byte) *Segment {
 	minSize := uint32(6)
 	conflictChecker := make(map[uint32]struct{}, len(buf))
 	head := &Segment{}
-	curSeg := head
+	cur := head
 	for _, posList := range byteMap {
 	nextPos:
-		for cur, next := 0, 1; next < len(posList); cur, next = cur+1, next+1 {
+		for curIndex, nextIndex := 0, 1; nextIndex < len(posList); curIndex, nextIndex = curIndex+1, nextIndex+1 {
 			// Finds the next pos that is far away enough to make a minSize group.
 			for {
-				if next >= len(posList) {
+				if nextIndex >= len(posList) {
 					continue nextPos
 				}
-				if posList[next]-posList[cur] >= minSize {
+				if posList[nextIndex]-posList[curIndex] >= minSize {
 					break
 				}
-				next++
+				nextIndex++
 			}
-			curPos := posList[cur]
-			nextPos := posList[next]
+			curPos := posList[curIndex]
+			nextPos := posList[nextIndex]
 			var startOffset, endOffset uint32
 			// Search for smallest startOffset in which both groups are still equal.
 			for newStart := startOffset + 1; curPos >= newStart; newStart++ {
@@ -50,7 +50,7 @@ func CreateRepeatingSegments(buf []byte) *Segment {
 			groupPos := []uint32{startPos, nextPos - startOffset}
 			newPosList := make([]uint32, 0, len(posList))
 			cmpBuf := buf[startPos:endPos]
-			for _, pos := range posList[next+1:] {
+			for _, pos := range posList[nextIndex+1:] {
 				startPos := pos - startOffset
 				// We need to be sure no other char is growing the same repetition group as we are.
 				// No matter which pos you start, once the group has grown, it will always have the same startPos.
@@ -70,22 +70,22 @@ func CreateRepeatingSegments(buf []byte) *Segment {
 			seg := &Segment{
 				Type:   TypeRepeatingGroup,
 				Repeat: 1,
-				Buffer: buf[curPos-startOffset : curPos+endOffset],
+				Buffer: buf[startPos:endPos],
 				Pos:    groupPos,
 			}
 			if seg.GetCompressionGains() > 0 {
 				for _, pos := range seg.Pos {
 					conflictChecker[pos] = struct{}{}
 				}
-				curSeg = curSeg.Append(seg)
+				cur = cur.Append(seg)
 				// Update newPosList with positions that are still not used in any repetition group.
 				posList = newPosList
-				cur, next = -1, 0
+				curIndex, nextIndex = -1, 0
 			}
 		}
 	}
 	// Remove empty head.
-	head.Remove()
+	head = head.Remove()
 	var prev uint32
 	for _, seg := range sortAndFilterSegments(head) {
 		// Prevent segment interpolation by removing the group on the pos.
@@ -93,8 +93,11 @@ func CreateRepeatingSegments(buf []byte) *Segment {
 			seg.RemovePos(seg.Pos)
 			continue
 		}
-		curSeg = curSeg.Append(NewSegment(TypeRepeatingGroup, prev, 1, buf[prev:seg.Pos]))
+		cur = cur.Append(NewSegment(TypeUncompressed, prev, 1, buf[prev:seg.Pos]))
 		prev = seg.Pos + uint32(len(seg.Buffer))
+	}
+	if prev < bufLen {
+		cur.Append(NewSegment(TypeUncompressed, prev, 1, buf[prev:]))
 	}
 	return head
 }

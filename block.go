@@ -19,17 +19,14 @@ func (b *Block) Remove(s *Segment) {
 }
 
 // Remove deletes element.
-func (s *Segment) Remove() {
+func (s *Segment) Remove() *Segment {
 	if s.Next != nil {
 		s.Next.Previous = s.Previous
 	}
 	if s.Previous != nil {
 		s.Previous.Next = s.Next
-		return
 	}
-	if s.Next != nil {
-		*s = *s.Next
-	}
+	return s.Next
 }
 
 func (s *Segment) ForEach(f func(*Segment)) {
