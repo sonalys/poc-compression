@@ -9,14 +9,15 @@ func Compress(in []byte) *Block {
 	if len(in) > math.MaxUint32 {
 		panic("input is over 4294967295 bytes long")
 	}
+	size := uint32(len(in))
 	//out, tail := CreateSameCharSegments(in)
-	out, head := CreateRepeatingSegments(in)
 	// head.Tail().Append(tail)
-	b := Block{
-		Size:   uint32(len(in)),
+	head := CreateRepeatingSegments(in)
+	head.Deduplicate()
+	uncompressedBuffer := head.RemoveNegativeSegments(size)
+	return &Block{
+		Size:   size,
 		Head:   head,
-		Buffer: out,
+		Buffer: uncompressedBuffer,
 	}
-	b.Optimize()
-	return &b
 }

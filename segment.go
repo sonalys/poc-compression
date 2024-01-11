@@ -69,6 +69,15 @@ func NewSegment(t SegmentType, pos uint32, repeat uint16, buffer []byte) *Segmen
 	return resp
 }
 
+func (s *Segment) RemovePos(pos uint32) {
+	for i := range s.Pos {
+		if s.Pos[i] == pos {
+			s.Pos = append(s.Pos[:i], s.Pos[i+1:]...)
+			break
+		}
+	}
+}
+
 // AddPos will append all positions from pos into the current segment,
 // it will return error if it overflows the maximum capacity of the segment.
 func (s *Segment) AddPos(pos []uint32) (*Segment, error) {
