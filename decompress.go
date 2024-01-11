@@ -8,7 +8,7 @@ type SegmentPosMap struct {
 }
 
 func sortAndFilterSegments(list *LinkedList[Segment], sortType bool, filters ...func(*ListEntry[Segment]) bool) []SegmentPosMap {
-	out := make([]SegmentPosMap, 0, 500)
+	out := make([]SegmentPosMap, 0, list.Len)
 	cur := list.Head
 	for {
 		if cur == nil {

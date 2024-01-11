@@ -48,6 +48,9 @@ func (l *ListEntry[T]) Remove() {
 
 // Append adds a segment after the current.
 func (l *ListEntry[T]) Append(next *ListEntry[T]) *ListEntry[T] {
+	if next == nil {
+		return l
+	}
 	next.Tail().Next = l.Next
 	l.Next = next
 	next.Prev = l

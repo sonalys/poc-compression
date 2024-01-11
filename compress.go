@@ -10,18 +10,23 @@ func Compress(in []byte) *Block {
 		panic("input is over 4294967295 bytes long")
 	}
 	size := uint32(len(in))
-	// Layer 1 - Remove same char repeat.
-	layer1 := CreateSameCharSegments(in)
-	out := RevertBadSegments(layer1, size)
-	// Layer 2 - Remove group repeat.
-	layer2 := CreateRepeatingSegments(out)
-	out = RevertBadSegments(layer2, size)
-	// Build final segment list.
-	layer2.Tail.Append(layer1.Head)
-	Deduplicate(layer2)
+
+	layers := []func([]byte) *LinkedList[Segment]{
+		CreateSameCharSegments,
+		CreateRepeatingSegments,
+	}
+
+	list := NewLinkedList[Segment]().AppendValue(nil)
+	for _, layer := range layers {
+		layer := layer(in)
+		in = RevertBadSegments(layer, size)
+		list.Tail.Append(layer.Head)
+	}
+	list.Head.Remove()
+	Deduplicate(list)
 	return &Block{
 		Size:   size,
-		List:   layer2,
-		Buffer: out,
+		List:   list,
+		Buffer: in,
 	}
 }
