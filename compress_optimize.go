@@ -2,7 +2,7 @@ package gompressor
 
 // RevertBadSegments is responsible for reverting bad segments.
 func RevertBadSegments(list *LinkedList[Segment], size uint32) []byte {
-	orderedSegments := sortAndFilterSegments(list, func(cur *ListEntry[Segment]) bool {
+	orderedSegments := sortAndFilterSegments(list, false, func(cur *ListEntry[Segment]) bool {
 		if cur.Value.GetCompressionGains() <= 0 {
 			cur.Remove()
 			return true

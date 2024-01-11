@@ -1,8 +1,7 @@
 package gompressor
 
-func CreateSameCharSegments(in []byte) []byte {
+func CreateSameCharSegments(in []byte) *LinkedList[Segment] {
 	lenIn := uint32(len(in))
-	out := make([]byte, 0, lenIn)
 	var prev uint32
 	list := &LinkedList[Segment]{}
 	// finds repetition groups and store them.
@@ -19,16 +18,16 @@ func CreateSameCharSegments(in []byte) []byte {
 		}
 		// avoid creating segments with nil buffer.
 		if index-prev > 0 {
-			out = append(out, in[prev:index]...)
+			list.AppendValue(NewSegment(TypeUncompressed, prev, 1, in[prev:index]))
 		}
 		list.AppendValue(NewSegment(TypeRepeatSameChar, index, repeatCount, []byte{in[index]}))
 		index += uint32(repeatCount) - 1
 		prev = index + 1
 	}
 	if list.Head == nil {
-		out = in
+		list.AppendValue(NewSegment(TypeUncompressed, 0, 1, in))
 	} else if lenIn-prev > 0 {
-		out = append(out, in[prev:]...)
+		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, in[prev:]))
 	}
-	return out
+	return list
 }

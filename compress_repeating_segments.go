@@ -84,7 +84,7 @@ func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 		}
 	}
 	var prev uint32
-	for _, seg := range sortAndFilterSegments(list) {
+	for _, seg := range sortAndFilterSegments(list, false) {
 		// Prevent segment interpolation by removing the group on the pos.
 		if prev > seg.Pos {
 			seg.RemovePos(seg.Pos)
