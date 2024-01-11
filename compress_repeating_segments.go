@@ -2,13 +2,12 @@ package gompressor
 
 import "bytes"
 
-func CreateRepeatingSegments(buf []byte) *Segment {
+func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 	bufLen := uint32(len(buf))
 	byteMap := MapBytePos(buf)
 	minSize := uint32(6)
 	conflictChecker := make(map[uint32]struct{}, len(buf))
-	head := &Segment{}
-	cur := head
+	list := NewLinkedList[Segment]()
 	for _, posList := range byteMap {
 	nextPos:
 		for curIndex, nextIndex := 0, 1; nextIndex < len(posList); curIndex, nextIndex = curIndex+1, nextIndex+1 {
@@ -77,27 +76,25 @@ func CreateRepeatingSegments(buf []byte) *Segment {
 				for _, pos := range seg.Pos {
 					conflictChecker[pos] = struct{}{}
 				}
-				cur = cur.Append(seg)
+				list.AppendValue(seg)
 				// Update newPosList with positions that are still not used in any repetition group.
 				posList = newPosList
 				curIndex, nextIndex = -1, 0
 			}
 		}
 	}
-	// Remove empty head.
-	head = head.Remove()
 	var prev uint32
-	for _, seg := range sortAndFilterSegments(head) {
+	for _, seg := range sortAndFilterSegments(list) {
 		// Prevent segment interpolation by removing the group on the pos.
 		if prev > seg.Pos {
 			seg.RemovePos(seg.Pos)
 			continue
 		}
-		cur = cur.Append(NewSegment(TypeUncompressed, prev, 1, buf[prev:seg.Pos]))
+		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, buf[prev:seg.Pos]))
 		prev = seg.Pos + uint32(len(seg.Buffer))
 	}
 	if prev < bufLen {
-		cur.Append(NewSegment(TypeUncompressed, prev, 1, buf[prev:]))
+		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, buf[prev:]))
 	}
-	return head
+	return list
 }

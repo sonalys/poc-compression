@@ -68,9 +68,14 @@ func Encode(b *Block) []byte {
 	out = encoder.AppendUint32(out, b.Size)
 	out = encoder.AppendUint32(out, uint32(len(b.Buffer)))
 	out = append(out, b.Buffer...)
-	b.Head.ForEach(func(s *Segment) {
-		out = append(out, s.Encode()...)
-	})
+	cur := b.List.Head
+	for {
+		if cur == nil {
+			break
+		}
+		out = append(out, cur.Value.Encode()...)
+		cur = cur.Next
+	}
 	return out
 }
 
@@ -78,21 +83,19 @@ func Decode(b []byte) (out *Block, err error) {
 	var pos uint32
 	out = &Block{
 		Size: decoder.Uint32(b[0:]),
-		Head: &Segment{},
+		List: &LinkedList[Segment]{},
 	}
 	pos += 8
 	out.Buffer = b[pos : pos+decoder.Uint32(b[4:])]
 	pos += uint32(len(out.Buffer))
-	cur := out.Head
+	cur := out.List
 	for {
 		if pos == uint32(len(b)) {
 			break
 		}
 		decoded, offset := DecodeSegment(b[pos:])
-		cur = cur.Append(decoded)
+		cur.AppendValue(decoded)
 		pos += offset
 	}
-	// Fix head.
-	out.Remove(out.Head)
 	return
 }

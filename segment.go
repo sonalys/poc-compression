@@ -7,11 +7,10 @@ import (
 )
 
 type Segment struct {
-	Type           SegmentType
-	Repeat         uint16
-	Buffer         []byte
-	Previous, Next *Segment
-	Pos            []uint32
+	Type   SegmentType
+	Repeat uint16
+	Buffer []byte
+	Pos    []uint32
 }
 
 // Decompress returns the segment to it's decompressed state.
@@ -88,32 +87,4 @@ func (s *Segment) AddPos(pos []uint32) (*Segment, error) {
 	}
 	s.Pos = append(s.Pos, pos...)
 	return s, nil
-}
-
-// Append adds a segment after the current.
-func (s *Segment) Append(next *Segment) *Segment {
-	// Finds the tail of the next segment chain.
-	cur := next
-	for {
-		if cur.Next == nil {
-			break
-		}
-		cur = cur.Next
-	}
-	// Merges the two segment chains.
-	cur.Next = s.Next
-	s.Next = next
-	next.Previous = s
-	return next
-}
-
-func (s *Segment) Tail() *Segment {
-	cur := s
-	for {
-		if cur.Next == nil {
-			break
-		}
-		cur = cur.Next
-	}
-	return cur
 }

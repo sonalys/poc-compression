@@ -98,19 +98,24 @@ func Test_bestMinSize(t *testing.T) {
 		}
 	}
 
-	block.Head.ForEach(func(entry *Segment) {
+	cur := block.List.Head
+	for {
+		if cur == nil {
+			break
+		}
 		segmentCount++
-		if repeat := int(entry.Repeat); repeat > maxRepeat {
+		if repeat := int(cur.Value.Repeat); repeat > maxRepeat {
 			maxRepeat = repeat
 		} else if repeat < minRepeat {
 			minRepeat = repeat
 		}
-		if gain := entry.GetCompressionGains(); gain > maxGain {
+		if gain := cur.Value.GetCompressionGains(); gain > maxGain {
 			maxGain = gain
 		} else if gain < minGain {
 			minGain = gain
 		}
-	})
+		cur = cur.Next
+	}
 
 	ratio := float64(compressedSize) / float64(len(in))
 	t.Logf(`

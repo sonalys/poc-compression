@@ -11,13 +11,13 @@ func Compress(in []byte) *Block {
 	}
 	size := uint32(len(in))
 	//out, tail := CreateSameCharSegments(in)
-	// head.Tail().Append(tail)
-	head := CreateRepeatingSegments(in)
-	head = head.Deduplicate()
-	head, uncompressedBuffer := head.RevertBadSegments(size)
+	// list.Tail().Append(tail)
+	list := CreateRepeatingSegments(in)
+	Deduplicate(list)
+	uncompressedBuffer := RevertBadSegments(list, size)
 	return &Block{
 		Size:   size,
-		Head:   head,
+		List:   list,
 		Buffer: uncompressedBuffer,
 	}
 }

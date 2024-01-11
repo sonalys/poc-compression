@@ -7,21 +7,28 @@ type SegmentPosMap struct {
 	*Segment
 }
 
-func sortAndFilterSegments(head *Segment, filters ...func(*Segment) bool) []SegmentPosMap {
+func sortAndFilterSegments(list *LinkedList[Segment], filters ...func(*ListEntry[Segment]) bool) []SegmentPosMap {
 	out := make([]SegmentPosMap, 0, 500)
-	head.ForEach(func(s *Segment) {
+	cur := list.Head
+	for {
+		if cur == nil {
+			break
+		}
+		curValue := cur.Value
 		for _, filter := range filters {
-			if !filter(s) {
-				return
+			if !filter(cur) {
+				goto final
 			}
 		}
-		for _, pos := range s.Pos {
+		for _, pos := range curValue.Pos {
 			out = append(out, SegmentPosMap{
 				Pos:     pos,
-				Segment: s,
+				Segment: curValue,
 			})
 		}
-	})
+	final:
+		cur = cur.Next
+	}
 	sort.Slice(out, func(i, j int) bool {
 		// We layer the logic by segment type, so some segments should decompress first than others.
 		// if out[i].Type != out[j].Type {
@@ -35,7 +42,7 @@ func sortAndFilterSegments(head *Segment, filters ...func(*Segment) bool) []Segm
 func Decompress(b *Block) []byte {
 	out := make([]byte, b.Size)
 	copy(out, b.Buffer)
-	for _, cur := range sortAndFilterSegments(b.Head) {
+	for _, cur := range sortAndFilterSegments(b.List) {
 		buf := cur.Decompress()
 		lenBuf := uint32(len(buf))
 		// right-shift data.

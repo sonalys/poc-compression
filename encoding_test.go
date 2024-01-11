@@ -44,7 +44,7 @@ func Test_SegmentEncoding(t *testing.T) {
 func Test_BlockEncoding(t *testing.T) {
 	b := &Block{
 		Size:   100,
-		Head:   nil,
+		List:   nil,
 		Buffer: []byte{1, 2, 3},
 	}
 	encoded := Encode(b)
