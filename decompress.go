@@ -2,13 +2,13 @@ package gompressor
 
 import "sort"
 
-type SegmentPosMap struct {
-	Pos uint32
-	*Segment
+type SegmentPosMap[S BlockSize] struct {
+	Pos S
+	*Segment[S]
 }
 
-func sortAndFilterSegments(list *LinkedList[Segment], sortType bool, filters ...func(*ListEntry[Segment]) bool) []SegmentPosMap {
-	out := make([]SegmentPosMap, 0, list.Len)
+func sortAndFilterSegments[S BlockSize](list *LinkedList[Segment[S]], sortType bool, filters ...func(*ListEntry[Segment[S]]) bool) []SegmentPosMap[S] {
+	out := make([]SegmentPosMap[S], 0, list.Len)
 	cur := list.Head
 	for {
 		if cur == nil {
@@ -21,7 +21,7 @@ func sortAndFilterSegments(list *LinkedList[Segment], sortType bool, filters ...
 			}
 		}
 		for _, pos := range curValue.Pos {
-			out = append(out, SegmentPosMap{
+			out = append(out, SegmentPosMap[S]{
 				Pos:     pos,
 				Segment: curValue,
 			})
@@ -41,12 +41,12 @@ func sortAndFilterSegments(list *LinkedList[Segment], sortType bool, filters ...
 	return out
 }
 
-func Decompress(b *Block) []byte {
+func Decompress[S BlockSize](b *Block[S]) []byte {
 	out := make([]byte, b.Size)
 	copy(out, b.Buffer)
 	for _, cur := range sortAndFilterSegments(b.List, true) {
 		buf := cur.Decompress()
-		lenBuf := uint32(len(buf))
+		lenBuf := S(len(buf))
 		// right-shift data.
 		copy(out[cur.Pos+lenBuf:], out[cur.Pos:])
 		// copy out decompressed buf into out[pos].

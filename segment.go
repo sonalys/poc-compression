@@ -6,15 +6,15 @@ import (
 	"math"
 )
 
-type Segment struct {
+type Segment[S BlockSize] struct {
 	Type   SegmentType
 	Repeat uint16
 	Buffer []byte
-	Pos    []uint32
+	Pos    []S
 }
 
 // Decompress returns the segment to it's decompressed state.
-func (s *Segment) Decompress() []byte {
+func (s *Segment[S]) Decompress() []byte {
 	switch s.Type {
 	case TypeUncompressed, TypeRepeatingGroup:
 		return s.Buffer
@@ -26,7 +26,7 @@ func (s *Segment) Decompress() []byte {
 }
 
 // GetOriginalSize returns decompressed size for the segment.
-func (s *Segment) GetOriginalSize() int64 {
+func (s *Segment[S]) GetOriginalSize() int64 {
 	repeat := int64(s.Repeat)
 	bufLen := int64(len(s.Buffer))
 	posLen := int64(len(s.Pos))
@@ -35,7 +35,7 @@ func (s *Segment) GetOriginalSize() int64 {
 }
 
 // GetCompressionGains returns how many bytes this section is compressing.
-func (s *Segment) GetCompressionGains() int64 {
+func (s *Segment[S]) GetCompressionGains() int64 {
 	posLen := int64(len(s.Pos))
 	bufLen := int64(len(s.Buffer))
 	originalSize := s.GetOriginalSize()
@@ -55,17 +55,17 @@ func (s *Segment) GetCompressionGains() int64 {
 }
 
 // NewSegment creates a new segment.
-func NewSegment(t SegmentType, pos uint32, repeat uint16, buffer []byte) *Segment {
-	resp := &Segment{
+func NewSegment[S BlockSize](t SegmentType, pos S, repeat uint16, buffer []byte) *Segment[S] {
+	resp := &Segment[S]{
 		Type:   t,
 		Repeat: repeat,
 		Buffer: buffer,
-		Pos:    []uint32{pos},
+		Pos:    []S{pos},
 	}
 	return resp
 }
 
-func (s *Segment) RemovePos(pos uint32) {
+func (s *Segment[S]) RemovePos(pos S) {
 	for i := range s.Pos {
 		if s.Pos[i] == pos {
 			s.Pos = append(s.Pos[:i], s.Pos[i+1:]...)
@@ -76,7 +76,7 @@ func (s *Segment) RemovePos(pos uint32) {
 
 // AddPos will append all positions from pos into the current segment,
 // it will return error if it overflows the maximum capacity of the segment.
-func (s *Segment) AddPos(pos []uint32) (*Segment, error) {
+func (s *Segment[S]) AddPos(pos []S) (*Segment[S], error) {
 	newLen := len(s.Pos) + len(pos)
 	if newLen > maxSegmentPos {
 		return s, fmt.Errorf("len(pos) overflow")

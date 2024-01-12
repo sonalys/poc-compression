@@ -1,7 +1,11 @@
 package gompressor
 
-type Block struct {
-	Size   uint32
-	List   *LinkedList[Segment]
+import "golang.org/x/exp/constraints"
+
+type BlockSize = constraints.Unsigned
+
+type Block[S BlockSize] struct {
+	Size   S
+	List   *LinkedList[Segment[S]]
 	Buffer []byte
 }

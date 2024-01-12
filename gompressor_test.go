@@ -50,9 +50,9 @@ func Test_encoding(t *testing.T) {
 	// 	t.Fatalf("failed to read file: %s", err)
 	// }
 
-	expBlock := Compress(in)
+	expBlock := Compress[uint32](in)
 	expSerialized := Encode(expBlock)
-	gotBlock, err := Decode(expSerialized)
+	gotBlock, err := Decode[uint32](expSerialized)
 	require.NoError(t, err)
 
 	t.Run("reconstruction", func(t *testing.T) {
@@ -75,7 +75,8 @@ func Test_encoding(t *testing.T) {
 
 func Test_bestMinSize(t *testing.T) {
 	const path string = "" +
-		"/bin/zsh"
+		// "/bin/zsh"
+		"/home/raicon/Downloads/snake.com"
 		// "/storage/DJI_0003.MP4"
 		// "/home/raicon/Pictures/Screenshot_20240105_145006.png"
 	in, err := os.ReadFile(path)
@@ -83,12 +84,12 @@ func Test_bestMinSize(t *testing.T) {
 		t.Fatalf("failed to read file: %s", err)
 	}
 	// in = in[:100]
-	// stats := CountRepetitions(in)
+	// stats := MapBytePos[uint8](in)
 	// t.Logf("%v", stats)
 	var segmentCount int
 	var minRepeat, maxRepeat int = math.MaxInt, 0
 	var minGain, maxGain int64 = math.MaxInt64, 0
-	block := Compress(in)
+	block := Compress[uint8](in)
 	serialize := Encode(block)
 	compressedSize := int64(len(serialize))
 

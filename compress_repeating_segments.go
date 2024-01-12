@@ -2,12 +2,12 @@ package gompressor
 
 import "bytes"
 
-func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
-	bufLen := uint32(len(buf))
-	byteMap := MapBytePos(buf)
-	minSize := uint32(6)
-	conflictChecker := make(map[uint32]struct{}, len(buf))
-	list := NewLinkedList[Segment]()
+func CreateRepeatingSegments[S BlockSize](buf []byte) *LinkedList[Segment[S]] {
+	bufLen := S(len(buf))
+	byteMap := MapBytePos[S](buf)
+	minSize := S(2)
+	conflictChecker := make(map[S]struct{}, len(buf))
+	list := NewLinkedList[Segment[S]]()
 	for _, posList := range byteMap {
 	nextPos:
 		for curIndex, nextIndex := 0, 1; nextIndex < len(posList); curIndex, nextIndex = curIndex+1, nextIndex+1 {
@@ -23,7 +23,7 @@ func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 			}
 			curPos := posList[curIndex]
 			nextPos := posList[nextIndex]
-			var startOffset, endOffset uint32
+			var startOffset, endOffset S
 			// Search for smallest startOffset in which both groups are still equal.
 			for newStart := startOffset + 1; curPos >= newStart; newStart++ {
 				if buf[curPos-newStart] == buf[nextPos-newStart] {
@@ -46,8 +46,8 @@ func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 			}
 			startPos := curPos - startOffset
 			endPos := curPos + endOffset
-			groupPos := []uint32{startPos, nextPos - startOffset}
-			newPosList := make([]uint32, 0, len(posList))
+			groupPos := []S{startPos, nextPos - startOffset}
+			newPosList := make([]S, 0, len(posList))
 			cmpBuf := buf[startPos:endPos]
 			for _, pos := range posList[nextIndex+1:] {
 				startPos := pos - startOffset
@@ -66,7 +66,7 @@ func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 				}
 				newPosList = append(newPosList, pos)
 			}
-			seg := &Segment{
+			seg := &Segment[S]{
 				Type:   TypeRepeatingGroup,
 				Repeat: 1,
 				Buffer: buf[startPos:endPos],
@@ -83,7 +83,7 @@ func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 			}
 		}
 	}
-	var prev uint32
+	var prev S
 	for _, seg := range sortAndFilterSegments(list, false) {
 		// Prevent segment interpolation by removing the group on the pos.
 		if prev > seg.Pos {
@@ -91,7 +91,7 @@ func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 			continue
 		}
 		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, buf[prev:seg.Pos]))
-		prev = seg.Pos + uint32(len(seg.Buffer))
+		prev = seg.Pos + S(len(seg.Buffer))
 	}
 	if prev < bufLen {
 		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, buf[prev:]))

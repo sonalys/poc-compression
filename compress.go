@@ -1,30 +1,26 @@
 package gompressor
 
-import "math"
-
 // TODO: Test bloom-filters for regenerating a byte dictionary
 // try to create 2 or 3 filters, multiplying by prime numbers to get more precision.
 
-func Compress(in []byte) *Block {
-	if len(in) > math.MaxUint32 {
-		panic("input is over 4294967295 bytes long")
+func Compress[S BlockSize](in []byte) *Block[S] {
+	size := S(len(in))
+	if int64(len(in)) > int64(size) {
+		panic("size overflow on compress input")
 	}
-	size := uint32(len(in))
-
-	layers := []func([]byte) *LinkedList[Segment]{
-		CreateSameCharSegments,
-		CreateRepeatingSegments,
+	layers := []func([]byte) *LinkedList[Segment[S]]{
+		CreateSameCharSegments[S],
+		CreateRepeatingSegments[S],
 	}
-
-	list := NewLinkedList[Segment]().AppendValue(nil)
+	list := NewLinkedList[Segment[S]]().AppendValue(nil)
 	for _, layer := range layers {
 		layer := layer(in)
-		in = RevertBadSegments(layer, size)
+		in = RevertBadSegments[S](layer, size)
 		list.Tail.Append(layer.Head)
 	}
 	list.Head.Remove()
 	Deduplicate(list)
-	return &Block{
+	return &Block[S]{
 		Size:   size,
 		List:   list,
 		Buffer: in,

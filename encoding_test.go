@@ -8,7 +8,7 @@ import (
 
 func Test_SegmentEncoding(t *testing.T) {
 	t.Run("uncompressed segment", func(t *testing.T) {
-		segment := Segment{
+		segment := Segment[uint32]{
 			Type:   TypeUncompressed,
 			Repeat: 1,
 			Buffer: []byte{1, 2, 3},
@@ -16,7 +16,7 @@ func Test_SegmentEncoding(t *testing.T) {
 		}
 		buffer := segment.Encode()
 
-		got, pos := DecodeSegment(buffer)
+		got, pos := DecodeSegment[uint32](buffer)
 		if pos != uint32(len(buffer)) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
@@ -24,7 +24,7 @@ func Test_SegmentEncoding(t *testing.T) {
 	})
 
 	t.Run("repeat segment", func(t *testing.T) {
-		segment := Segment{
+		segment := Segment[uint32]{
 			Type:   TypeRepeatSameChar,
 			Repeat: 2,
 			Buffer: []byte{1, 2, 3},
@@ -33,7 +33,7 @@ func Test_SegmentEncoding(t *testing.T) {
 
 		buffer := segment.Encode()
 
-		got, pos := DecodeSegment(buffer)
+		got, pos := DecodeSegment[uint32](buffer)
 		if pos != uint32(len(buffer)) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
@@ -42,13 +42,13 @@ func Test_SegmentEncoding(t *testing.T) {
 }
 
 func Test_BlockEncoding(t *testing.T) {
-	b := &Block{
+	b := &Block[uint32]{
 		Size:   100,
 		List:   nil,
 		Buffer: []byte{1, 2, 3},
 	}
 	encoded := Encode(b)
-	got, err := Decode(encoded)
+	got, err := Decode[uint32](encoded)
 	require.NoError(t, err)
 	require.Equal(t, b, got)
 }

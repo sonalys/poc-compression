@@ -3,7 +3,7 @@ package gompressor
 import "bytes"
 
 // Deduplicate will find segments that are identical, besides position, and merge them.
-func Deduplicate(list *LinkedList[Segment]) {
+func Deduplicate[S BlockSize](list *LinkedList[Segment[S]]) {
 	cur := list.Head
 	for {
 		if cur == nil {
