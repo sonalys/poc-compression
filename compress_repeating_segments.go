@@ -2,8 +2,8 @@ package gompressor
 
 import "bytes"
 
-func getStartOffset[S BlockSize](buf []byte, curPos, nextPos S) S {
-	var startOffset S
+func getStartOffset(buf []byte, curPos, nextPos int64) int64 {
+	var startOffset int64
 	// Search for smallest startOffset in which both groups are still equal.
 	for newStart := startOffset + 1; curPos >= newStart; newStart++ {
 		if buf[curPos-newStart] == buf[nextPos-newStart] {
@@ -15,9 +15,9 @@ func getStartOffset[S BlockSize](buf []byte, curPos, nextPos S) S {
 	return startOffset
 }
 
-func getEndOffset[S BlockSize](buf []byte, curPos, nextPos S) S {
-	var endOffset S
-	bufLen := S(len(buf))
+func getEndOffset(buf []byte, curPos, nextPos int64) int64 {
+	var endOffset int64
+	bufLen := int64(len(buf))
 	for newEnd := endOffset + 1; nextPos+newEnd < bufLen; newEnd++ {
 		if buf[curPos+newEnd] == buf[nextPos+newEnd] {
 			endOffset = newEnd
@@ -28,7 +28,7 @@ func getEndOffset[S BlockSize](buf []byte, curPos, nextPos S) S {
 	return endOffset
 }
 
-func getNextIndex[S BlockSize](posList []S, minSize S, curIndex int, nextIndex int) (int, bool) {
+func getNextIndex(posList []int64, minSize int64, curIndex int, nextIndex int) (int, bool) {
 	for {
 		if nextIndex >= len(posList) {
 			return -1, false
@@ -41,13 +41,13 @@ func getNextIndex[S BlockSize](posList []S, minSize S, curIndex int, nextIndex i
 	return nextIndex, true
 }
 
-func getOtherRepeatingPos[S BlockSize](
-	posList []S,
-	bufLen S,
+func getOtherRepeatingPos(
+	posList []int64,
+	bufLen int64,
 	buf, cmp []byte,
-	conflictChecker map[S]struct{},
-	startOffset, endOffset S,
-) (resp, unusedPos []S, conflict bool) {
+	conflictChecker map[int64]struct{},
+	startOffset, endOffset int64,
+) (resp, unusedPos []int64, conflict bool) {
 	for _, pos := range posList {
 		startPos := pos - startOffset
 		// We need to be sure no other char is growing the same repetition group as we are.
@@ -68,12 +68,12 @@ func getOtherRepeatingPos[S BlockSize](
 	return
 }
 
-func CreateRepeatingSegments[S BlockSize](buf []byte) *LinkedList[Segment[S]] {
-	bufLen := S(len(buf))
-	byteMap := MapBytePos[S](buf)
-	minSize := S(2)
-	conflictChecker := make(map[S]struct{}, 1000)
-	list := NewLinkedList[Segment[S]]()
+func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
+	bufLen := int64(len(buf))
+	byteMap := MapBytePos(buf)
+	minSize := int64(2)
+	conflictChecker := make(map[int64]struct{}, 1000)
+	list := NewLinkedList[Segment]()
 	for _, posList := range byteMap {
 		for curIndex, nextIndex := 0, 1; nextIndex < len(posList); curIndex, nextIndex = curIndex+1, nextIndex+1 {
 			// Finds the next pos that is far away enough to make a minSize group.
@@ -90,7 +90,7 @@ func CreateRepeatingSegments[S BlockSize](buf []byte) *LinkedList[Segment[S]] {
 
 			start := posList[curIndex] - startOffset
 			end := posList[curIndex] + endOffset
-			groupPos := []S{start, posList[nextIndex] - startOffset}
+			groupPos := []int64{start, posList[nextIndex] - startOffset}
 
 			pos, unused, conflict := getOtherRepeatingPos(posList[nextIndex+1:], bufLen, buf, buf[start:end], conflictChecker, startOffset, endOffset)
 			if conflict {
@@ -98,7 +98,7 @@ func CreateRepeatingSegments[S BlockSize](buf []byte) *LinkedList[Segment[S]] {
 			}
 			posList = unused
 
-			seg := &Segment[S]{
+			seg := &Segment{
 				Type:   TypeRepeatingGroup,
 				Repeat: 1,
 				Buffer: buf[start:end],
@@ -115,7 +115,7 @@ func CreateRepeatingSegments[S BlockSize](buf []byte) *LinkedList[Segment[S]] {
 			}
 		}
 	}
-	var prev S
+	var prev int64
 	for _, seg := range sortAndFilterSegments(list, false) {
 		// Prevent segment interpolation by removing the group on the pos.
 		if prev > seg.Pos {
@@ -123,7 +123,7 @@ func CreateRepeatingSegments[S BlockSize](buf []byte) *LinkedList[Segment[S]] {
 			continue
 		}
 		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, buf[prev:seg.Pos]))
-		prev = seg.Pos + S(len(seg.Buffer))
+		prev = seg.Pos + int64(len(seg.Buffer))
 	}
 	if prev < bufLen {
 		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, buf[prev:]))

@@ -1,57 +1,44 @@
 package gompressor
 
-// meta is a bitmask used to store metadata.
+// Metadata is a bitmask used to store metadata.
 // Address	|		data
 //
 //	1, 2					Segment types = max 4.
 //	3*						If type Repeat, 0 = 1 byte, 1 = 2 bytes for seg.Repeat.
-//	4,5,6,7,8			posLen = max 32.
-type meta uint8
+//	4							lenPos size, 0 = 1 byte, 1 = 2 bytes
+//	5, 6					lenBuf size, 0 = 1 byte, 1 = 2 bytes, 2 = 4 bytes, 3 = 8 bytes
+//	7, 8					pos    size, 0 = 1 byte, 1 = 2 bytes, 3 = 4 bytes, 4 = 8 bytes
+type Metadata uint8
 type SegmentType uint8
+type Mask uint8
 
 const (
 	TypeUncompressed SegmentType = iota
 	TypeRepeatingGroup
 	TypeRepeatSameChar
 
-	flagRepeatIs2Bytes meta = 0b1 << 2
-
-	maxSegmentPos int = 0b11111
+	SegmentTypeMask Mask = 0b11
+	RepeatSizeMask  Mask = 0b1 << 2
+	LenPosSizeMask  Mask = 0b1 << 4
+	PosSizeMask     Mask = 0b11 << 5
+	LenBufSizeMask  Mask = 0b11 << 6
 )
 
-func NewMetadata(t SegmentType, posLen uint8, repeatSize bool) meta {
-	resp := meta(t)
-	resp = resp.setPosLen(posLen)
-	resp = resp.setIsRepeat2Bytes(repeatSize)
-	return resp
+func NewMetadata() *Metadata {
+	m := Metadata(0)
+	return &m
 }
 
-// setPosLen
-// 1. clears the last 5 bytes
-// 2. left shift value 3 bytes
-// 3. set value of posLen.
-func (m meta) setPosLen(size uint8) meta {
-	return m&0b111 | (meta(size) << 3)
+func (m *Metadata) Set(mask Mask, value byte) *Metadata {
+	// Clear bits and then set value.
+	*m = Metadata(byte(*m)&^byte(mask) | byte(mask)&value)
+	return m
 }
 
-// getPosLen
-// right shift 3 bytes to get original posLen.
-func (m meta) getPosLen() byte { return byte(m >> 3) }
+func (m *Metadata) Check(mask Mask) byte {
+	return byte(*m) & byte(mask)
+}
 
-// setType
-// 1. clears bytes 2 and 3
-// 1. set bytes 2 and 3
-func (m meta) setType(t SegmentType) meta { return (m & 0b11111100) | meta(t) }
-
-// getType
-// clear all bytes except 2 and 3
-// shift right 1 byte to get segType
-func (m meta) getType() SegmentType { return SegmentType(m & 0b11) }
-
-func (m meta) isRepeat2Bytes() bool { return m&flagRepeatIs2Bytes != 0 }
-func (m meta) setIsRepeat2Bytes(value bool) meta {
-	if value {
-		return m | flagRepeatIs2Bytes
-	}
-	return m &^ flagRepeatIs2Bytes
+func (m *Metadata) ToByte() byte {
+	return byte(*m)
 }

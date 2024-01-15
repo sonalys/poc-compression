@@ -50,12 +50,12 @@ func CalculateSmallestDelta(input []byte, offset uint32, windowSize uint32) (uin
 	return pos, resp
 }
 
-func MapBytePos[S BlockSize](in []byte) (repetition [256][]S) {
+func MapBytePos(in []byte) (repetition [256][]int64) {
 	for pos, char := range in {
 		if repetition[char] == nil {
-			repetition[char] = make([]S, 0, 100)
+			repetition[char] = make([]int64, 0, 100)
 		}
-		repetition[char] = append(repetition[char], S(pos))
+		repetition[char] = append(repetition[char], int64(pos))
 	}
 	return
 }

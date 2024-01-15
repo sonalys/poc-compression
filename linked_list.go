@@ -16,7 +16,10 @@ func NewLinkedList[T any]() *LinkedList[T] {
 }
 
 // Append adds a segment after the current.
-func (l *LinkedList[T]) Append(next *ListEntry[T]) *ListEntry[T] {
+func (l *LinkedList[T]) Append(next *ListEntry[T]) *LinkedList[T] {
+	if next == nil {
+		return l
+	}
 	if l.Head == nil {
 		l.Head = next
 	}
@@ -35,7 +38,7 @@ func (l *LinkedList[T]) Append(next *ListEntry[T]) *ListEntry[T] {
 		cur.Ref = l
 		cur = cur.Next
 	}
-	return next.Tail()
+	return l
 }
 
 func (l *LinkedList[T]) AppendValue(value *T) *LinkedList[T] {

@@ -4,8 +4,8 @@ import "golang.org/x/exp/constraints"
 
 type BlockSize = constraints.Unsigned
 
-type Block[S BlockSize] struct {
-	Size   S
-	List   *LinkedList[Segment[S]]
+type Block struct {
+	Size   int64
+	List   *LinkedList[Segment]
 	Buffer []byte
 }

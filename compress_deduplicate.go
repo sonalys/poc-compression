@@ -1,7 +1,7 @@
 package gompressor
 
 // Deduplicate will find segments that are identical, besides position, and merge them.
-func Deduplicate[S BlockSize](list *LinkedList[Segment[S]]) {
+func Deduplicate(list *LinkedList[Segment]) {
 	cur := list.Head
 	for {
 		if cur == nil {
@@ -15,9 +15,8 @@ func Deduplicate[S BlockSize](list *LinkedList[Segment[S]]) {
 			curValue := cur.Value
 			iterValue := iter.Value
 			if curValue.CanMerge(iterValue) {
-				if _, err := curValue.AppendPos(iterValue.Pos); err == nil {
-					iter.Remove()
-				}
+				curValue.AppendPos(iterValue.Pos)
+				iter.Remove()
 			}
 			iter = iter.Next
 		}

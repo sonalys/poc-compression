@@ -8,48 +8,46 @@ import (
 var encoder = binary.BigEndian
 var decoder = binary.BigEndian
 
-func encodeValue[S BlockSize](b []byte, value S) []byte {
-	switch v := any(value).(type) {
-	case uint8:
-		return append(b, v)
-	case uint16:
-		return encoder.AppendUint16(b, v)
-	case uint32:
-		return encoder.AppendUint32(b, v)
-	case uint64:
-		return encoder.AppendUint64(b, v)
-	default:
-		panic("invalid blockSize type")
-	}
-}
-
-func decodeValue[S BlockSize](b []byte) (resp S) {
-	switch v := any(resp).(type) {
-	case uint8:
-		v = uint8(b[0])
-		return S(v)
-	case uint16:
-		v = decoder.Uint16(b)
-		return S(v)
-	case uint32:
-		v = decoder.Uint32(b)
-		return S(v)
-	case uint64:
-		v = decoder.Uint64(b)
-		return S(v)
-	default:
-		panic("invalid blockSize type")
-	}
-}
-
-func (cur *Segment[S]) Encode() []byte {
-	bufLen := S(len(cur.Buffer))
+func (cur *Segment) Encode() []byte {
+	bufLen := int64(len(cur.Buffer))
+	posLen := int64(len(cur.Pos))
 	// allocate buffers.
-	posLen := uint8(len(cur.Pos))
-	buffer := make([]byte, 0, 7+bufLen+S(posLen))
+	buffer := make([]byte, 0, cur.GetCompressedSize())
+	repeatSize := uint8(0)
+	if cur.Repeat > math.MaxUint8 {
+		repeatSize = 1
+	}
+	lenPosSize := uint8(0)
+	if posLen > math.MaxUint8 {
+		lenPosSize = 1
+	}
+	lenBufSize := uint8(0)
+	switch {
+	case bufLen > math.MaxUint32:
+		lenBufSize = 3
+	case bufLen > math.MaxUint16:
+		lenBufSize = 2
+	case bufLen > math.MaxUint8:
+		lenBufSize = 1
+	}
+	maxPos := Max(cur.Pos)
+	posSize := uint8(0)
+	switch {
+	case maxPos > math.MaxUint32:
+		posSize = 3
+	case maxPos > math.MaxUint16:
+		posSize = 2
+	case maxPos > math.MaxUint8:
+		posSize = 1
+	}
 	// start storing the binary.
-	buffer = append(buffer, byte(NewMetadata(cur.Type, posLen, cur.Repeat > math.MaxUint8)))
-	buffer = encodeValue(buffer, bufLen)
+	meta := NewMetadata().
+		Set(SegmentTypeMask, byte(cur.Type)).
+		Set(RepeatSizeMask, repeatSize).
+		Set(LenPosSizeMask, lenPosSize).
+		Set(LenBufSizeMask, lenBufSize).
+		Set(PosSizeMask, posSize)
+	buffer = append(buffer, meta.ToByte())
 	if cur.Type == TypeRepeatSameChar {
 		if cur.Repeat > math.MaxUint8 {
 			buffer = encoder.AppendUint16(buffer, cur.Repeat)
@@ -57,49 +55,97 @@ func (cur *Segment[S]) Encode() []byte {
 			buffer = append(buffer, byte(cur.Repeat))
 		}
 	}
+	switch lenPosSize {
+	case 0:
+		buffer = append(buffer, byte(posLen))
+	case 1:
+		buffer = encoder.AppendUint16(buffer, uint16(posLen))
+	}
 	// we don't need to store the first position, since our decompression logic doesn't use it.
 	for i := range cur.Pos {
-		buffer = encodeValue(buffer, cur.Pos[i])
+		switch posSize {
+		case 0:
+			buffer = append(buffer, byte(cur.Pos[i]))
+		case 1:
+			buffer = encoder.AppendUint16(buffer, uint16(cur.Pos[i]))
+		case 2:
+			buffer = encoder.AppendUint32(buffer, uint32(cur.Pos[i]))
+		case 3:
+			buffer = encoder.AppendUint64(buffer, uint64(cur.Pos[i]))
+		}
+	}
+	switch lenBufSize {
+	case 0:
+		buffer = append(buffer, byte(bufLen))
+	case 1:
+		buffer = encoder.AppendUint16(buffer, uint16(bufLen))
+	case 2:
+		buffer = encoder.AppendUint32(buffer, uint32(bufLen))
+	case 3:
+		buffer = encoder.AppendUint64(buffer, uint64(bufLen))
 	}
 	buffer = append(buffer, cur.Buffer...)
 	return buffer
 }
 
-func DecodeSegment[S BlockSize](b []byte) (*Segment[S], S) {
-	var pos S
-	flag := meta(b[pos])
-	pos += 1
-	cur := Segment[S]{
-		Type:   flag.getType(),
+func DecodeSegment(b []byte) (*Segment, int64) {
+	var pos int64
+	flag, pos := Metadata(b[pos]), pos+1
+	cur := Segment{
+		Type:   SegmentType(flag.Check(SegmentTypeMask)),
 		Repeat: 1,
-		Pos:    make([]S, flag.getPosLen()),
 	}
-	bufLen := decodeValue[S](b[pos:])
-	pos += 4
-	cur.Buffer = make([]byte, bufLen)
-	if flag.getType() == TypeRepeatSameChar {
-		if flag.isRepeat2Bytes() {
-			cur.Repeat = decoder.Uint16(b[pos:])
-			pos += 2
-		} else {
-			cur.Repeat = uint16(b[pos])
-			pos += 1
+	if cur.Type == TypeRepeatSameChar {
+		switch flag.Check(RepeatSizeMask) {
+		case 0:
+			cur.Repeat, pos = uint16(b[pos]), pos+1
+		case 1:
+			cur.Repeat, pos = decoder.Uint16(b[pos:]), pos+2
 		}
 	}
+	var posLen int16
+	switch flag.Check(LenPosSizeMask) {
+	case 0:
+		posLen, pos = int16(b[pos]), pos+1
+	case 1:
+		posLen, pos = int16(decoder.Uint16(b[pos:])), pos+2
+	}
+	cur.Pos = make([]int64, posLen)
 	for i := range cur.Pos {
-		cur.Pos[i] = decodeValue[S](b[pos:])
-		pos += 4
+		switch flag.Check(PosSizeMask) {
+		case 0:
+			cur.Pos[i], pos = int64(b[pos]), pos+1
+		case 1:
+			cur.Pos[i], pos = int64(decoder.Uint16(b[pos:])), pos+2
+		case 2:
+			cur.Pos[i], pos = int64(decoder.Uint32(b[pos:])), pos+4
+		case 3:
+			cur.Pos[i], pos = int64(decoder.Uint64(b[pos:])), pos+8
+		}
+	}
+	var bufLen int64
+	switch flag.Check(LenBufSizeMask) {
+	case 0:
+		bufLen, pos = int64(b[pos]), pos+1
+	case 1:
+		bufLen, pos = int64(decoder.Uint16(b[pos:])), pos+2
+	case 2:
+		bufLen, pos = int64(decoder.Uint32(b[pos:])), pos+4
+	case 3:
+		bufLen, pos = int64(decoder.Uint64(b[pos:])), pos+8
 	}
 	cur.Buffer = b[pos : pos+bufLen]
 	return &cur, pos + bufLen
 }
 
-func Encode[S BlockSize](b *Block[S]) []byte {
+func Compress(b *Block) []byte {
 	out := make([]byte, 0, 8+len(b.Buffer))
-	// Store original size of the buffer.
-	out = encodeValue(out, b.Size)
-	out = encodeValue(out, S(len(b.Buffer)))
+	out = encoder.AppendUint64(out, uint64(b.Size))
+	out = encoder.AppendUint64(out, uint64(len(b.Buffer)))
 	out = append(out, b.Buffer...)
+	if b.List == nil {
+		return out
+	}
 	cur := b.List.Head
 	for {
 		if cur == nil {
@@ -111,21 +157,21 @@ func Encode[S BlockSize](b *Block[S]) []byte {
 	return out
 }
 
-func Decode[S BlockSize](b []byte) (out *Block[S], err error) {
-	var pos S
-	out = &Block[S]{
-		Size: decodeValue[S](b[0:]),
-		List: &LinkedList[Segment[S]]{},
+func Decode(b []byte) (out *Block, err error) {
+	var pos int64
+	out = &Block{
+		Size: int64(decoder.Uint64(b[0:])),
+		List: &LinkedList[Segment]{},
 	}
 	pos += 8
-	out.Buffer = b[pos : pos+decodeValue[S](b[4:])]
-	pos += S(len(out.Buffer))
+	out.Buffer = b[pos : pos+int64(decoder.Uint64(b[4:]))]
+	pos += int64(len(out.Buffer))
 	cur := out.List
 	for {
-		if pos == S(len(b)) {
+		if pos == int64(len(b)) {
 			break
 		}
-		decoded, offset := DecodeSegment[S](b[pos:])
+		decoded, offset := DecodeSegment(b[pos:])
 		cur.AppendValue(decoded)
 		pos += offset
 	}

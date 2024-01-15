@@ -8,34 +8,28 @@ import (
 
 func Test_GetCompressionGain(t *testing.T) {
 	t.Run("positive gain", func(t *testing.T) {
-		seg := &Segment[uint32]{
+		seg := &Segment{
 			Type:   TypeRepeatSameChar,
 			Repeat: 50,
 			Buffer: []byte{1, 2},
-			Pos:    []uint32{0, 100},
+			Pos:    []int64{0, 100},
 		}
-
-		compressed := seg.Encode()
 		originalSize := int64(200)
-		compressedSize := int64(len(compressed))
+		compressedSize := int64(len(seg.Encode()))
 		gains := seg.GetCompressionGains()
-
 		require.Equal(t, originalSize-compressedSize, gains)
 	})
 
 	t.Run("negative gain", func(t *testing.T) {
-		seg := &Segment[uint32]{
+		seg := &Segment{
 			Type:   TypeUncompressed,
 			Repeat: 1,
 			Buffer: []byte{1, 2},
-			Pos:    []uint32{0, 100},
+			Pos:    []int64{0, 100},
 		}
-
-		compressed := seg.Encode()
 		originalSize := int64(4)
-		compressedSize := int64(len(compressed))
+		compressedSize := int64(len(seg.Encode()))
 		gains := seg.GetCompressionGains()
-
 		require.Equal(t, originalSize-compressedSize, gains)
 	})
 }
