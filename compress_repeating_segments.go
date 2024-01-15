@@ -71,7 +71,7 @@ func getOtherRepeatingPos[S BlockSize](
 func CreateRepeatingSegments[S BlockSize](buf []byte) *LinkedList[Segment[S]] {
 	bufLen := S(len(buf))
 	byteMap := MapBytePos[S](buf)
-	minSize := S(4)
+	minSize := S(2)
 	conflictChecker := make(map[S]struct{}, 1000)
 	list := NewLinkedList[Segment[S]]()
 	for _, posList := range byteMap {

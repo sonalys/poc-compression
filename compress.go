@@ -19,6 +19,7 @@ func Compress[S BlockSize](in []byte) *Block[S] {
 		in = RevertBadSegments[S](newSegments, size)
 		list.Append(newSegments.Head)
 	}
+	Deduplicate(list)
 	return &Block[S]{
 		Size:   size,
 		List:   list,
