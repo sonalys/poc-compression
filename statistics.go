@@ -59,3 +59,11 @@ func MapBytePos[S BlockSize](in []byte) (repetition [256][]S) {
 	}
 	return
 }
+
+func CalculateByteDensity(in []byte) (int, float64) {
+	byteMap := make(map[byte]struct{}, 256)
+	for _, char := range in {
+		byteMap[char] = struct{}{}
+	}
+	return len(byteMap), float64(len(byteMap)) / float64(len(in))
+}

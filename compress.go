@@ -12,14 +12,13 @@ func Compress[S BlockSize](in []byte) *Block[S] {
 		CreateSameCharSegments[S],
 		CreateRepeatingSegments[S],
 	}
-	list := NewLinkedList[Segment[S]]().AppendValue(nil)
-	for _, layer := range layers {
-		layer := layer(in)
-		in = RevertBadSegments[S](layer, size)
-		list.Tail.Append(layer.Head)
+	list := NewLinkedList[Segment[S]]()
+	for _, compressionLayer := range layers {
+		newSegments := compressionLayer(in)
+		Deduplicate(list)
+		in = RevertBadSegments[S](newSegments, size)
+		list.Append(newSegments.Head)
 	}
-	list.Head.Remove()
-	Deduplicate(list)
 	return &Block[S]{
 		Size:   size,
 		List:   list,

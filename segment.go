@@ -74,13 +74,17 @@ func (s *Segment[S]) RemovePos(pos S) {
 	}
 }
 
-// AddPos will append all positions from pos into the current segment,
+// AppendPos will append all positions from pos into the current segment,
 // it will return error if it overflows the maximum capacity of the segment.
-func (s *Segment[S]) AddPos(pos []S) (*Segment[S], error) {
+func (s *Segment[S]) AppendPos(pos []S) (*Segment[S], error) {
 	newLen := len(s.Pos) + len(pos)
 	if newLen > maxSegmentPos {
 		return s, fmt.Errorf("len(pos) overflow")
 	}
 	s.Pos = append(s.Pos, pos...)
 	return s, nil
+}
+
+func (s *Segment[S]) CanMerge(other *Segment[S]) bool {
+	return !(s.Type != other.Type || s.Repeat != other.Repeat || !bytes.Equal(s.Decompress(), other.Decompress()))
 }

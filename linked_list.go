@@ -15,6 +15,29 @@ func NewLinkedList[T any]() *LinkedList[T] {
 	return &LinkedList[T]{}
 }
 
+// Append adds a segment after the current.
+func (l *LinkedList[T]) Append(next *ListEntry[T]) *ListEntry[T] {
+	if l.Head == nil {
+		l.Head = next
+	}
+	if l.Tail == nil {
+		l.Tail = next.Tail()
+	} else {
+		l.Tail.Next = next
+		next.Prev = l.Tail
+	}
+	// Update ref inside sub-list.
+	cur := next
+	for {
+		if cur == nil {
+			break
+		}
+		cur.Ref = l
+		cur = cur.Next
+	}
+	return next.Tail()
+}
+
 func (l *LinkedList[T]) AppendValue(value *T) *LinkedList[T] {
 	entry := &ListEntry[T]{
 		Value: value,
@@ -48,13 +71,36 @@ func (l *ListEntry[T]) Remove() {
 
 // Append adds a segment after the current.
 func (l *ListEntry[T]) Append(next *ListEntry[T]) *ListEntry[T] {
+	// If next is nil do nothing, return current.
 	if next == nil {
 		return l
 	}
+	// Update ref inside sub-list.
+	cur := next
+	for {
+		if cur == nil {
+			break
+		}
+		cur.Ref = l.Ref
+		cur = cur.Next
+	}
+	// Update head, tail ref.
+	if l.Ref.Head == nil {
+		l.Ref.Head = next
+	}
+	if l.Ref.Tail == nil {
+		l.Ref.Tail = next.Tail()
+	}
+	// Return last element of chain.
+	if l == nil {
+		return next.Tail()
+	}
+	// Update ref between the 2 chains.
 	next.Tail().Next = l.Next
 	l.Next = next
 	next.Prev = l
-	return next
+	// Return last element of chain.
+	return next.Tail()
 }
 
 func (l *ListEntry[T]) Tail() *ListEntry[T] {
