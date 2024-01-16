@@ -48,7 +48,22 @@ func TestMetadata_Set(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.m.Set(tt.args.mask, tt.args.value)
-			require.Equal(t, tt.want, *got)
+			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func Test_SegmentMetaSet(t *testing.T) {
+	meta := NewMetadata().
+		SetType(TypeRepeatingGroup).
+		SetRepSize(1).
+		SetPosLenSize(0).
+		SetBufLenSize(2).
+		SetPosSize(3)
+
+	require.EqualValues(t, TypeRepeatingGroup, meta.GetType())
+	require.EqualValues(t, 1, meta.GetRepSize())
+	require.EqualValues(t, 0, meta.GetPosLenSize())
+	require.EqualValues(t, 2, meta.GetBufLenSize())
+	require.EqualValues(t, 3, meta.GetPosSize())
 }

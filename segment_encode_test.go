@@ -40,15 +40,3 @@ func Test_SegmentEncoding(t *testing.T) {
 		require.Equal(t, segment, got)
 	})
 }
-
-func Test_BlockEncoding(t *testing.T) {
-	b := &Block{
-		Size:   100,
-		List:   nil,
-		Buffer: []byte{1, 2, 3},
-	}
-	encoded := Compress(b)
-	got, err := Decode(encoded)
-	require.NoError(t, err)
-	require.Equal(t, b, got)
-}

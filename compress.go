@@ -3,7 +3,7 @@ package gompressor
 // TODO: Test bloom-filters for regenerating a byte dictionary
 // try to create 2 or 3 filters, multiplying by prime numbers to get more precision.
 
-func NewBlock(in []byte) *Block {
+func Compress(in []byte) *Block {
 	size := int64(len(in))
 	layers := []func([]byte) *LinkedList[Segment]{
 		CreateSameCharSegments,
@@ -18,8 +18,8 @@ func NewBlock(in []byte) *Block {
 	}
 	Deduplicate(list)
 	return &Block{
-		Size:   size,
-		List:   list,
-		Buffer: in,
+		OriginalSize: size,
+		List:         list,
+		Buffer:       in,
 	}
 }

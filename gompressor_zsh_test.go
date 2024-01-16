@@ -1,6 +1,8 @@
 package gompressor
 
 import (
+	"bytes"
+	"log"
 	"math"
 	"os"
 	"testing"
@@ -21,62 +23,70 @@ func Test_compressZSH(t *testing.T) {
 		t.Fatalf("failed to read file: %s", err)
 	}
 
-	block := NewBlock(in)
-	compressedOut := Compress(block)
+	block := Compress(in)
+	compressedOut := Encode(block)
 	compressedSize := int64(len(compressedOut))
 
 	t.Run("test decompression", func(t *testing.T) {
-		out := Decompress(block)
-		require.Equal(t, len(in), len(out), "input and output are different")
-		for i := range in {
-			if in[i] != out[i] {
-				window := 20
-				require.Equal(t, in[i], out[i], "in[%d] != out[%d]\n%v\n%v", i, i, in[i:i+window], out[i:i+window])
-			}
-		}
+		block2, err := Decode(compressedOut)
+		require.NoError(t, err)
+		out := Decompress(block2)
+		require.Equal(t, len(in), len(out))
+		require.True(t, bytes.Equal(in, out))
 	})
 
-	var segmentCount int
-	var minRepeat, maxRepeat int = math.MaxInt, 0
-	var minGain, maxGain int64 = math.MaxInt64, 0
+	t.Run("statistics", func(t *testing.T) {
+		var segmentCount int
+		var minRepeat, maxRepeat int = math.MaxInt, 0
+		var minGain, maxGain int64 = math.MaxInt64, 0
+		var minBufferSize int64 = math.MaxInt64
+		var minBufferSeg *Segment
+		cur := block.List.Head
+		for {
+			if cur == nil {
+				break
+			}
+			segmentCount++
+			if bufSize := int64(len(cur.Value.Buffer)); bufSize*int64(cur.Value.Repeat) < minBufferSize {
+				minBufferSize = bufSize * int64(cur.Value.Repeat)
+				minBufferSeg = cur.Value
+			}
+			if repeat := int(cur.Value.Repeat); repeat > maxRepeat {
+				maxRepeat = repeat
+			} else if repeat < minRepeat {
+				minRepeat = repeat
+			}
+			if gain := cur.Value.GetCompressionGains(); gain > maxGain {
+				maxGain = gain
+			} else if gain < minGain {
+				minGain = gain
+			}
+			cur = cur.Next
+		}
 
-	cur := block.List.Head
-	for {
-		if cur == nil {
-			break
-		}
-		segmentCount++
-		if repeat := int(cur.Value.Repeat); repeat > maxRepeat {
-			maxRepeat = repeat
-		} else if repeat < minRepeat {
-			minRepeat = repeat
-		}
-		if gain := cur.Value.GetCompressionGains(); gain > maxGain {
-			maxGain = gain
-		} else if gain < minGain {
-			minGain = gain
-		}
-		cur = cur.Next
-	}
+		log.Print(minBufferSeg)
 
-	ratio := float64(compressedSize) / float64(len(in))
-	t.Logf(`
+		ratio := float64(compressedSize) / float64(len(in))
+		t.Logf(`
 byte ratio				%.2f (%d / %d)
 compressed: 			%d bytes
 segments count: 	%d
 min repeat: 			%d
 max repeat:			 	%d
+min buffer size:	%d
 min gain:				 	%d bytes
 max gain: 				%d bytes
 `,
-		ratio,
-		compressedSize,
-		int64(len(in)),
-		int64(len(in))-compressedSize,
-		segmentCount,
-		minRepeat,
-		maxRepeat,
-		minGain,
-		maxGain,
-	)
+			ratio,
+			compressedSize,
+			int64(len(in)),
+			int64(len(in))-compressedSize,
+			segmentCount,
+			minRepeat,
+			maxRepeat,
+			minBufferSize,
+			minGain,
+			maxGain,
+		)
+	})
 }

@@ -71,10 +71,12 @@ func getOtherRepeatingPos(
 func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 	bufLen := int64(len(buf))
 	byteMap := MapBytePos(buf)
-	minSize := int64(2)
-	conflictChecker := make(map[int64]struct{}, 1000)
+	minSize := int64(4)
+	conflictChecker := make(map[int64]struct{}, 1024)
 	list := NewLinkedList[Segment]()
 	for _, posList := range byteMap {
+		// TODO: change this strategy to use first and last value, and they meet in the middle.
+		// this will allow us to detect repeating groups that contains cur and next, and skip positions that are contained in the group.
 		for curIndex, nextIndex := 0, 1; nextIndex < len(posList); curIndex, nextIndex = curIndex+1, nextIndex+1 {
 			// Finds the next pos that is far away enough to make a minSize group.
 			nextIndex, ok := getNextIndex(posList, minSize, curIndex, nextIndex)
@@ -87,38 +89,34 @@ func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 			if endOffset+startOffset < minSize {
 				continue
 			}
-
 			start := posList[curIndex] - startOffset
 			end := posList[curIndex] + endOffset
-			groupPos := []int64{start, posList[nextIndex] - startOffset}
 
 			pos, unused, conflict := getOtherRepeatingPos(posList[nextIndex+1:], bufLen, buf, buf[start:end], conflictChecker, startOffset, endOffset)
 			if conflict {
 				continue
 			}
+			pos = append(pos, start, posList[nextIndex]-startOffset)
 			posList = unused
-
-			seg := &Segment{
+			cur := &Segment{
 				Type:   TypeRepeatingGroup,
 				Repeat: 1,
 				Buffer: buf[start:end],
-				Pos:    append(groupPos, pos...),
 			}
-			if seg.GetCompressionGains() > 0 {
-				for _, pos := range seg.Pos {
-					conflictChecker[pos] = struct{}{}
-				}
-				list.AppendValue(seg)
-				// Update newPosList with positions that are still not used in any repetition group.
-				posList = unused
-				curIndex, nextIndex = -1, 0
+			cur.AppendPos(pos)
+			for _, pos := range cur.Pos {
+				conflictChecker[pos] = struct{}{}
 			}
+			list.AppendValue(cur)
+			// Update newPosList with positions that are still not used in any repetition group.
+			posList = unused
+			curIndex, nextIndex = -1, 0
 		}
 	}
 	var prev int64
 	for _, seg := range sortAndFilterSegments(list, false) {
 		// Prevent segment interpolation by removing the group on the pos.
-		if prev > seg.Pos {
+		if prev >= seg.Pos {
 			seg.RemovePos(seg.Pos)
 			continue
 		}
