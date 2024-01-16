@@ -8,34 +8,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var paths = []string{
+	"/bin/zsh",
+	"/home/raicon/Downloads/snake.com",
+	"/storage/DJI_0003.MP4",
+	"/home/raicon/Pictures/Screenshot_20240105_145006.png",
+}
+
 func Test_compressZSH(t *testing.T) {
-	const path string = "" +
-		"/bin/zsh"
-		// "/home/raicon/Downloads/snake.com"
-		// "/storage/DJI_0003.MP4"
-		// "/home/raicon/Pictures/Screenshot_20240105_145006.png"
-	in, err := os.ReadFile(path)
+	in, err := os.ReadFile(paths[0])
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
-	// in = in[:100]
-	// count, stats := CalculateByteDensity(in)
-	// t.Logf("%d %v", count, stats)
-	var segmentCount int
-	var minRepeat, maxRepeat int = math.MaxInt, 0
-	var minGain, maxGain int64 = math.MaxInt64, 0
+
 	block := NewBlock(in)
 	compressedOut := Compress(block)
 	compressedSize := int64(len(compressedOut))
 
-	out := Decompress(block)
-	require.Equal(t, len(in), len(out), "input and output are different")
-	for i := range in {
-		if in[i] != out[i] {
-			window := 20
-			require.Equal(t, in[i], out[i], "in[%d] != out[%d]\n%v\n%v", i, i, in[i:i+window], out[i:i+window])
+	t.Run("test decompression", func(t *testing.T) {
+		out := Decompress(block)
+		require.Equal(t, len(in), len(out), "input and output are different")
+		for i := range in {
+			if in[i] != out[i] {
+				window := 20
+				require.Equal(t, in[i], out[i], "in[%d] != out[%d]\n%v\n%v", i, i, in[i:i+window], out[i:i+window])
+			}
 		}
-	}
+	})
+
+	var segmentCount int
+	var minRepeat, maxRepeat int = math.MaxInt, 0
+	var minGain, maxGain int64 = math.MaxInt64, 0
 
 	cur := block.List.Head
 	for {

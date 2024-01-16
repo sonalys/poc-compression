@@ -30,7 +30,7 @@ func (cur *Segment) Encode() []byte {
 	case bufLen > math.MaxUint8:
 		lenBufSize = 1
 	}
-	maxPos := Max(cur.Pos)
+	maxPos := cur.MaxPos
 	posSize := uint8(0)
 	switch {
 	case maxPos > math.MaxUint32:

@@ -8,9 +8,11 @@ package gompressor
 //	4							lenPos size, 0 = 1 byte, 1 = 2 bytes
 //	5, 6					lenBuf size, 0 = 1 byte, 1 = 2 bytes, 2 = 4 bytes, 3 = 8 bytes
 //	7, 8					pos    size, 0 = 1 byte, 1 = 2 bytes, 3 = 4 bytes, 4 = 8 bytes
-type Metadata uint8
-type SegmentType uint8
-type Mask uint8
+type (
+	Metadata    uint8
+	SegmentType uint8
+	Mask        uint8
+)
 
 const (
 	TypeUncompressed SegmentType = iota

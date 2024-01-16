@@ -9,6 +9,7 @@ type Segment struct {
 	Type   SegmentType
 	Repeat uint16
 	Buffer []byte
+	MaxPos int64
 	Pos    []int64
 }
 
@@ -59,7 +60,7 @@ func (s *Segment) GetCompressedSize() int64 {
 			compressedSize += 1
 		}
 	}
-	maxPos := Max(s.Pos)
+	maxPos := s.MaxPos
 	compressedSize += posLen * getInt64SegmentBitSize(maxPos)
 	compressedSize += bufLen
 	return compressedSize
@@ -76,12 +77,16 @@ func NewSegment(t SegmentType, pos int64, repeat uint16, buffer []byte) *Segment
 		Type:   t,
 		Repeat: repeat,
 		Buffer: buffer,
+		MaxPos: pos,
 		Pos:    []int64{pos},
 	}
 	return resp
 }
 
 func (s *Segment) RemovePos(pos int64) {
+	if s.MaxPos == pos {
+		s.MaxPos = Max(s.Pos)
+	}
 	for i := range s.Pos {
 		if s.Pos[i] == pos {
 			s.Pos = append(s.Pos[:i], s.Pos[i+1:]...)
@@ -93,6 +98,11 @@ func (s *Segment) RemovePos(pos int64) {
 // AppendPos will append all positions from pos into the current segment,
 // it will return error if it overflows the maximum capacity of the segment.
 func (s *Segment) AppendPos(pos []int64) *Segment {
+	for i := range pos {
+		if pos[i] > s.MaxPos {
+			s.MaxPos = pos[i]
+		}
+	}
 	s.Pos = append(s.Pos, pos...)
 	return s
 }

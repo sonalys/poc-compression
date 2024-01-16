@@ -15,11 +15,21 @@ func Deduplicate(list *LinkedList[Segment]) {
 			curValue := cur.Value
 			iterValue := iter.Value
 			if curValue.CanMerge(iterValue) {
-				curValue.AppendPos(iterValue.Pos)
-				iter.Remove()
+				curSize := curValue.GetCompressedSize()
+				iterSize := curValue.GetCompressedSize()
+				// Merge into the node that is saving more space.
+				if curSize < iterSize {
+					curValue.AppendPos(iterValue.Pos)
+					iter.Remove()
+				} else {
+					iterValue.AppendPos(curValue.Pos)
+					cur.Remove()
+					goto nextcur
+				}
 			}
 			iter = iter.Next
 		}
+	nextcur:
 		cur = cur.Next
 	}
 }
