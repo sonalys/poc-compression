@@ -1,15 +1,17 @@
 package gompressor
 
+import "math"
+
 func CreateSameCharSegments(in []byte) *LinkedList[Segment] {
 	lenIn := int64(len(in))
 	var prev int64
 	list := &LinkedList[Segment]{}
 	// finds repetition groups and store them.
 	for index := int64(0); index < lenIn; index++ {
-		repeatCount := uint16(1)
+		repeatCount := int64(1)
 		for j := index + 1; j < lenIn && in[index] == in[j]; j++ {
 			repeatCount += 1
-			if repeatCount == 0 {
+			if repeatCount > math.MaxUint16 {
 				panic("repeat overflow")
 			}
 		}
@@ -18,16 +20,16 @@ func CreateSameCharSegments(in []byte) *LinkedList[Segment] {
 		}
 		// avoid creating segments with nil buffer.
 		if index-prev > 0 {
-			list.AppendValue(NewSegment(TypeUncompressed, prev, 1, in[prev:index]))
+			list.AppendValue(NewSegment(TypeUncompressed, prev, in[prev:index]))
 		}
-		list.AppendValue(NewSegment(TypeRepeatSameChar, index, repeatCount, []byte{in[index]}))
-		index += int64(repeatCount) - 1
+		list.AppendValue(NewRepeatSegment(index, uint16(repeatCount), []byte{in[index]}))
+		index += repeatCount - 1
 		prev = index + 1
 	}
 	if list.Head == nil {
-		list.AppendValue(NewSegment(TypeUncompressed, 0, 1, in))
+		list.AppendValue(NewSegment(TypeUncompressed, 0, in))
 	} else if lenIn-prev > 0 {
-		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, in[prev:]))
+		list.AppendValue(NewSegment(TypeUncompressed, prev, in[prev:]))
 	}
 	return list
 }

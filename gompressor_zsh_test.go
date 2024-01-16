@@ -2,7 +2,6 @@ package gompressor
 
 import (
 	"bytes"
-	"log"
 	"math"
 	"os"
 	"testing"
@@ -27,7 +26,7 @@ func Test_compressZSH(t *testing.T) {
 	compressedOut := Encode(block)
 	compressedSize := int64(len(compressedOut))
 
-	t.Run("test decompression", func(t *testing.T) {
+	t.Run("reconstruction", func(t *testing.T) {
 		block2, err := Decode(compressedOut)
 		require.NoError(t, err)
 		out := Decompress(block2)
@@ -40,7 +39,6 @@ func Test_compressZSH(t *testing.T) {
 		var minRepeat, maxRepeat int = math.MaxInt, 0
 		var minGain, maxGain int64 = math.MaxInt64, 0
 		var minBufferSize int64 = math.MaxInt64
-		var minBufferSeg *Segment
 		cur := block.List.Head
 		for {
 			if cur == nil {
@@ -49,7 +47,6 @@ func Test_compressZSH(t *testing.T) {
 			segmentCount++
 			if bufSize := int64(len(cur.Value.Buffer)); bufSize*int64(cur.Value.Repeat) < minBufferSize {
 				minBufferSize = bufSize * int64(cur.Value.Repeat)
-				minBufferSeg = cur.Value
 			}
 			if repeat := int(cur.Value.Repeat); repeat > maxRepeat {
 				maxRepeat = repeat
@@ -64,18 +61,15 @@ func Test_compressZSH(t *testing.T) {
 			cur = cur.Next
 		}
 
-		log.Print(minBufferSeg)
-
 		ratio := float64(compressedSize) / float64(len(in))
 		t.Logf(`
-byte ratio				%.2f (%d / %d)
-compressed: 			%d bytes
-segments count: 	%d
-min repeat: 			%d
-max repeat:			 	%d
-min buffer size:	%d
-min gain:				 	%d bytes
-max gain: 				%d bytes
+ratio:			%.2f (%d / %d)
+compressed:	%d bytes
+segments:		%d
+repeat:			%d min %d max
+minBuffer:	%d
+minGain:		%d bytes
+maxGain:		%d bytes
 `,
 			ratio,
 			compressedSize,

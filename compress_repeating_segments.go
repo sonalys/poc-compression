@@ -2,6 +2,8 @@ package gompressor
 
 import "bytes"
 
+// getStartOffset grows a byte group from the start position, finding the largest group possible.
+// this group must repeat in curPos and nextPos.
 func getStartOffset(buf []byte, curPos, nextPos int64) int64 {
 	var startOffset int64
 	// Search for smallest startOffset in which both groups are still equal.
@@ -15,6 +17,8 @@ func getStartOffset(buf []byte, curPos, nextPos int64) int64 {
 	return startOffset
 }
 
+// getEndOffset grows a byte group from the end position, finding the largest group possible.
+// this group must repeat in curPos and nextPos.
 func getEndOffset(buf []byte, curPos, nextPos int64) int64 {
 	var endOffset int64
 	bufLen := int64(len(buf))
@@ -28,26 +32,14 @@ func getEndOffset(buf []byte, curPos, nextPos int64) int64 {
 	return endOffset
 }
 
-func getNextIndex(posList []int64, minSize int64, curIndex int, nextIndex int) (int, bool) {
-	for {
-		if nextIndex >= len(posList) {
-			return -1, false
-		}
-		if posList[nextIndex]-posList[curIndex] >= minSize {
-			break
-		}
-		nextIndex++
-	}
-	return nextIndex, true
-}
-
+// getOtherRepeatingPos finds all other positions from the same byte value that also repeat the group found.
 func getOtherRepeatingPos(
 	posList []int64,
-	bufLen int64,
 	buf, cmp []byte,
 	conflictChecker map[int64]struct{},
 	startOffset, endOffset int64,
 ) (resp, unusedPos []int64, conflict bool) {
+	bufLen := int64(len(buf))
 	for _, pos := range posList {
 		startPos := pos - startOffset
 		// We need to be sure no other char is growing the same repetition group as we are.
@@ -68,6 +60,22 @@ func getOtherRepeatingPos(
 	return
 }
 
+// findStartSearchIndex finds the next position that is not contained by the current matching group.
+func findStartSearchIndex(posList []int64, first int, endPos int64) int {
+	startSearchIndex := first
+	for {
+		if posList[startSearchIndex] > endPos {
+			break
+		}
+		startSearchIndex += 1
+	}
+	return startSearchIndex
+}
+
+// CreateRepeatingSegments detects repeating groups of bytes and index them into the same segment.
+// It does it so by indexing the positions of each byte from 0..255, then using their positions for detecting
+// repeating groups, since if they repeat, they should contain the same byte.
+// We then grow each group as large as possible and index them.
 func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 	bufLen := int64(len(buf))
 	byteMap := MapBytePos(buf)
@@ -75,56 +83,48 @@ func CreateRepeatingSegments(buf []byte) *LinkedList[Segment] {
 	conflictChecker := make(map[int64]struct{}, 1024)
 	list := NewLinkedList[Segment]()
 	for _, posList := range byteMap {
-		// TODO: change this strategy to use first and last value, and they meet in the middle.
-		// this will allow us to detect repeating groups that contains cur and next, and skip positions that are contained in the group.
-		for curIndex, nextIndex := 0, 1; nextIndex < len(posList); curIndex, nextIndex = curIndex+1, nextIndex+1 {
-			// Finds the next pos that is far away enough to make a minSize group.
-			nextIndex, ok := getNextIndex(posList, minSize, curIndex, nextIndex)
-			if !ok {
-				continue
-			}
-			startOffset := getStartOffset(buf, posList[curIndex], posList[nextIndex])
-			endOffset := getEndOffset(buf, posList[curIndex], posList[nextIndex])
+		for firstIdx, lastIdx := 0, len(posList)-1; lastIdx > firstIdx && posList[lastIdx]-posList[firstIdx] >= minSize; firstIdx, lastIdx = firstIdx+1, lastIdx-1 {
+			startOffset := getStartOffset(buf, posList[firstIdx], posList[lastIdx])
+			endOffset := getEndOffset(buf, posList[firstIdx], posList[lastIdx])
 			// Ensure the repetition found is bigger than minSize.
 			if endOffset+startOffset < minSize {
 				continue
 			}
-			start := posList[curIndex] - startOffset
-			end := posList[curIndex] + endOffset
+			start := posList[firstIdx] - startOffset
+			end := posList[firstIdx] + endOffset
+			startSearchIndex := findStartSearchIndex(posList, firstIdx+1, end)
 
-			pos, unused, conflict := getOtherRepeatingPos(posList[nextIndex+1:], bufLen, buf, buf[start:end], conflictChecker, startOffset, endOffset)
+			segPos, unusedPos, conflict := getOtherRepeatingPos(posList[startSearchIndex:], buf, buf[start:end], conflictChecker, startOffset, endOffset)
 			if conflict {
 				continue
 			}
-			pos = append(pos, start, posList[nextIndex]-startOffset)
-			posList = unused
-			cur := &Segment{
-				Type:   TypeRepeatingGroup,
-				Repeat: 1,
-				Buffer: buf[start:end],
-			}
-			cur.AppendPos(pos)
+			posList = unusedPos
+			cur := NewSegment(TypeRepeatingGroup, start, buf[start:end])
+			cur.AppendPos(segPos)
 			for _, pos := range cur.Pos {
 				conflictChecker[pos] = struct{}{}
 			}
 			list.AppendValue(cur)
-			// Update newPosList with positions that are still not used in any repetition group.
-			posList = unused
-			curIndex, nextIndex = -1, 0
+			// Update posList to contain only positions that weren't matched yet.
+			posList = unusedPos
+			firstIdx, lastIdx = -1, len(posList)
 		}
 	}
 	var prev int64
+	// Reconstrut the uncompressed segments that connects all the segments we created.
+	// We sort by POS here because they should be linear and crescent by pos.
 	for _, seg := range sortAndFilterSegments(list, false) {
 		// Prevent segment interpolation by removing the group on the pos.
 		if prev >= seg.Pos {
 			seg.RemovePos(seg.Pos)
 			continue
 		}
-		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, buf[prev:seg.Pos]))
+		list.AppendValue(NewSegment(TypeUncompressed, prev, buf[prev:seg.Pos]))
 		prev = seg.Pos + int64(len(seg.Buffer))
 	}
+	// If there is any remaining uncompressed buffer after our last segment, we need to put it on the buffer as well.
 	if prev < bufLen {
-		list.AppendValue(NewSegment(TypeUncompressed, prev, 1, buf[prev:]))
+		list.AppendValue(NewSegment(TypeUncompressed, prev, buf[prev:]))
 	}
 	return list
 }

@@ -10,7 +10,6 @@ func Test_SegmentEncoding(t *testing.T) {
 	t.Run("uncompressed segment", func(t *testing.T) {
 		segment := &Segment{
 			Type:   TypeUncompressed,
-			Repeat: 1,
 			Buffer: []byte{1, 2, 3},
 			Pos:    []int64{1, 2, 3},
 		}
@@ -26,9 +25,9 @@ func Test_SegmentEncoding(t *testing.T) {
 	t.Run("repeat segment", func(t *testing.T) {
 		segment := &Segment{
 			Type:   TypeRepeatSameChar,
-			Repeat: 2,
 			Buffer: []byte{1, 2, 3},
 			Pos:    []int64{1, 2, 3},
+			Repeat: 2,
 		}
 
 		buffer := segment.Encode()

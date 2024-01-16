@@ -7,10 +7,10 @@ import (
 
 type Segment struct {
 	Type   SegmentType
-	Repeat uint16
 	Buffer []byte
 	MaxPos int64
 	Pos    []int64
+	Repeat uint16
 }
 
 // Decompress returns the segment to it's decompressed state.
@@ -27,11 +27,16 @@ func (s *Segment) Decompress() []byte {
 
 // GetOriginalSize returns decompressed size for the segment.
 func (s *Segment) GetOriginalSize() int64 {
-	repeat := int64(s.Repeat)
-	bufLen := int64(len(s.Buffer))
-	posLen := int64(len(s.Pos))
-	originalSize := repeat * bufLen * posLen
-	return originalSize
+	switch s.Type {
+	case TypeRepeatSameChar:
+		repeat := int64(s.Repeat)
+		bufLen := int64(len(s.Buffer))
+		posLen := int64(len(s.Pos))
+		originalSize := repeat * bufLen * posLen
+		return originalSize
+	default:
+		return int64(len(s.Buffer))
+	}
 }
 
 func getInt64SegmentBitSize(n int64) int64 {
@@ -72,13 +77,24 @@ func (s *Segment) GetCompressionGains() int64 {
 }
 
 // NewSegment creates a new segment.
-func NewSegment(t SegmentType, pos int64, repeat uint16, buffer []byte) *Segment {
+func NewSegment(t SegmentType, pos int64, buffer []byte) *Segment {
 	resp := &Segment{
 		Type:   t,
-		Repeat: repeat,
 		Buffer: buffer,
 		MaxPos: pos,
 		Pos:    []int64{pos},
+	}
+	return resp
+}
+
+// NewSegment creates a new segment.
+func NewRepeatSegment(pos int64, repeat uint16, buffer []byte) *Segment {
+	resp := &Segment{
+		Type:   TypeRepeatSameChar,
+		Buffer: buffer,
+		MaxPos: pos,
+		Pos:    []int64{pos},
+		Repeat: repeat,
 	}
 	return resp
 }
@@ -108,5 +124,6 @@ func (s *Segment) AppendPos(pos []int64) *Segment {
 }
 
 func (s *Segment) CanMerge(other *Segment) bool {
-	return !(s.Type != other.Type || s.Repeat != other.Repeat || !bytes.Equal(s.Decompress(), other.Decompress()))
+	return len(s.Buffer) == len(other.Buffer) && s.Repeat == other.Repeat && bytes.Equal(s.Buffer, other.Buffer)
+	// return bytes.Equal(s.Decompress(), other.Decompress())
 }

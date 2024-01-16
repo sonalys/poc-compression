@@ -10,9 +10,9 @@ func Test_GetCompressionGain(t *testing.T) {
 	t.Run("positive gain", func(t *testing.T) {
 		seg := &Segment{
 			Type:   TypeRepeatSameChar,
-			Repeat: 50,
 			Buffer: []byte{1, 2},
 			Pos:    []int64{0, 100},
+			Repeat: 50,
 		}
 		originalSize := int64(200)
 		compressedSize := int64(len(seg.Encode()))
@@ -23,7 +23,6 @@ func Test_GetCompressionGain(t *testing.T) {
 	t.Run("negative gain", func(t *testing.T) {
 		seg := &Segment{
 			Type:   TypeUncompressed,
-			Repeat: 1,
 			Buffer: []byte{1, 2},
 			Pos:    []int64{0, 100},
 		}

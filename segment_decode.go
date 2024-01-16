@@ -11,8 +11,7 @@ func DecodeSegment(b []byte) (*Segment, int64) {
 	var pos int64
 	flag, pos := Metadata(b[pos]), pos+1
 	cur := Segment{
-		Type:   SegmentType(flag.Check(SegmentTypeMask)),
-		Repeat: 1,
+		Type: SegmentType(flag.Check(SegmentTypeMask)),
 	}
 	if cur.Type == TypeRepeatSameChar {
 		switch flag.GetRepSize() {
