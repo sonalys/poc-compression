@@ -125,5 +125,4 @@ func (s *Segment) AppendPos(pos []int64) *Segment {
 
 func (s *Segment) CanMerge(other *Segment) bool {
 	return len(s.Buffer) == len(other.Buffer) && s.Repeat == other.Repeat && bytes.Equal(s.Buffer, other.Buffer)
-	// return bytes.Equal(s.Decompress(), other.Decompress())
 }

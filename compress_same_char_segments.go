@@ -26,10 +26,7 @@ func CreateSameCharSegments(in []byte) *LinkedList[Segment] {
 		index += repeatCount - 1
 		prev = index + 1
 	}
-	if list.Head == nil {
-		list.AppendValue(NewSegment(TypeUncompressed, 0, in))
-	} else if lenIn-prev > 0 {
-		list.AppendValue(NewSegment(TypeUncompressed, prev, in[prev:]))
-	}
+	// Appends trailing uncompressed segment.
+	list.AppendValue(NewSegment(TypeUncompressed, prev, in[prev:]))
 	return list
 }
