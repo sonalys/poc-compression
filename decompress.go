@@ -1,10 +1,5 @@
 package gompressor
 
-type SegmentPosMap struct {
-	Pos int64
-	*Segment
-}
-
 func Decompress(b *Block) []byte {
 	out := make([]byte, b.OriginalSize)
 	copy(out, b.Buffer)

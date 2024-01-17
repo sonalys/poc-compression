@@ -27,15 +27,15 @@ func (s *Segment) Decompress() []byte {
 
 // GetOriginalSize returns decompressed size for the segment.
 func (s *Segment) GetOriginalSize() int64 {
+	posLen := int64(len(s.Pos))
+	bufLen := int64(len(s.Buffer))
 	switch s.Type {
 	case TypeRepeatSameChar:
 		repeat := int64(s.Repeat)
-		bufLen := int64(len(s.Buffer))
-		posLen := int64(len(s.Pos))
 		originalSize := repeat * bufLen * posLen
 		return originalSize
 	default:
-		return int64(len(s.Buffer))
+		return bufLen * posLen
 	}
 }
 
@@ -82,6 +82,7 @@ func NewSegment(t SegmentType, pos int64, buffer []byte) *Segment {
 		Type:   t,
 		Buffer: buffer,
 		MaxPos: pos,
+		Repeat: 1,
 		Pos:    []int64{pos},
 	}
 	return resp

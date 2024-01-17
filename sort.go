@@ -2,6 +2,12 @@ package gompressor
 
 import "sort"
 
+type SegmentPosMap struct {
+	Pos int64
+	*Segment
+	Entry *ListEntry[Segment]
+}
+
 func sortAndFilterSegments(list *LinkedList[Segment], sortType bool, filters ...func(*ListEntry[Segment]) bool) []SegmentPosMap {
 	out := make([]SegmentPosMap, 0, list.Len)
 	cur := list.Head
@@ -10,6 +16,9 @@ func sortAndFilterSegments(list *LinkedList[Segment], sortType bool, filters ...
 			break
 		}
 		curValue := cur.Value
+		if len(cur.Value.Pos) == 0 {
+			goto final
+		}
 		for _, filter := range filters {
 			if !filter(cur) {
 				goto final
@@ -18,6 +27,7 @@ func sortAndFilterSegments(list *LinkedList[Segment], sortType bool, filters ...
 		for _, pos := range curValue.Pos {
 			out = append(out, SegmentPosMap{
 				Pos:     pos,
+				Entry:   cur,
 				Segment: curValue,
 			})
 		}
