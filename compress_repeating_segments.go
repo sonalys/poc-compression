@@ -58,13 +58,25 @@ func matchRepeatingGroup(list []int64, buf, cmp []byte, startOffset, endOffset i
 	return
 }
 
-func findBytePosIndex(posList []int64, i int64) (int, bool) {
-	for j, pos := range posList {
-		if i == pos {
-			return j, true
+func binarySearch(arr []int64, l, r int, x int64) int {
+	for {
+		if l > r {
+			return -1
+		}
+		m := l + (r-l)/2
+		// Check if x is present at mid
+		if arr[m] == x {
+			return m
+		} else if arr[m] < x {
+			l = m + 1
+		} else {
+			r = m - 1
 		}
 	}
-	return -1, false
+}
+
+func findBytePosIndex(posList []int64, i int64) int {
+	return binarySearch(posList, 0, len(posList)-1, i)
 }
 
 // CreateRepeatingSegments2 should linearly detect repeating groups, without overlapping.
@@ -73,17 +85,19 @@ func CreateRepeatingSegments2(buf []byte) (*LinkedList[Segment], []byte) {
 	list := NewLinkedList[Segment]()
 	byteMap := MapBytePos(buf)
 	bufLen := int64(len(buf))
+	collisionCheck := make(map[int64]struct{}, len(buf))
+
 	for curPos := int64(0); curPos < bufLen; curPos++ {
 		char := buf[curPos]
 		bytePosList := byteMap[char]
-		posIndex, ok := findBytePosIndex(bytePosList, curPos)
-		if !ok {
+		posIndex := findBytePosIndex(bytePosList, curPos)
+		if posIndex == -1 {
 			continue
 		}
 		searchPosList := bytePosList[posIndex+1:]
 		for j := 0; j < len(searchPosList); j++ {
 			nextPos := searchPosList[j]
-			if _, ok := findBytePosIndex(bytePosList, nextPos); !ok {
+			if _, ok := collisionCheck[nextPos]; ok {
 				continue
 			}
 			startOffset := getStartOffset(buf, curPos, nextPos)
@@ -104,9 +118,9 @@ func CreateRepeatingSegments2(buf []byte) (*LinkedList[Segment], []byte) {
 		nextPos:
 			for _, pos := range matched {
 				// First check for byte collision with other segments.
-				for k, char := range groupBuf {
+				for k := range groupBuf {
 					charPos := pos + int64(k)
-					if _, ok := findBytePosIndex(byteMap[char], charPos); !ok {
+					if _, ok := collisionCheck[charPos]; ok {
 						continue nextPos
 					}
 				}
@@ -129,11 +143,12 @@ func CreateRepeatingSegments2(buf []byte) (*LinkedList[Segment], []byte) {
 			}
 			for char, posList := range bytesToRemove {
 				for _, pos := range posList {
-					posIndex, ok := findBytePosIndex(byteMap[char], pos)
-					if !ok {
+					posIndex := findBytePosIndex(byteMap[char], pos)
+					if posIndex == -1 {
 						panic("same byte mapped twice in the same segment")
 					}
 					byteMap[char] = append(byteMap[char][:posIndex], byteMap[char][posIndex+1:]...)
+					collisionCheck[pos] = struct{}{}
 				}
 			}
 			// Adds the segment to the list and remove all the bytes used from indexing.
