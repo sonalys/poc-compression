@@ -53,7 +53,7 @@ func CalculateSmallestDelta(input []byte, offset uint32, windowSize uint32) (uin
 func MapBytePos(in []byte) (repetition [256][]int64) {
 	for pos, char := range in {
 		if repetition[char] == nil {
-			repetition[char] = make([]int64, 0, 1)
+			repetition[char] = make([]int64, 0, 10)
 		}
 		repetition[char] = append(repetition[char], int64(pos))
 	}

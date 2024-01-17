@@ -2,9 +2,8 @@ package gompressor
 
 import "math"
 
-func CreateSameCharSegments(in []byte) *LinkedList[Segment] {
+func CreateSameCharSegments(in []byte) (*LinkedList[Segment], []byte) {
 	lenIn := int64(len(in))
-	var prev int64
 	list := &LinkedList[Segment]{}
 	// finds repetition groups and store them.
 	for index := int64(0); index < lenIn; index++ {
@@ -18,15 +17,9 @@ func CreateSameCharSegments(in []byte) *LinkedList[Segment] {
 		if repeatCount < 2 {
 			continue
 		}
-		// avoid creating segments with nil buffer.
-		if index-prev > 0 {
-			list.AppendValue(NewSegment(TypeUncompressed, prev, in[prev:index]))
-		}
 		list.AppendValue(NewRepeatSegment(index, uint16(repeatCount), []byte{in[index]}))
 		index += repeatCount - 1
-		prev = index + 1
 	}
-	// Appends trailing uncompressed segment.
-	list.AppendValue(NewSegment(TypeUncompressed, prev, in[prev:]))
-	return list
+	Deduplicate(list)
+	return list, FillSegmentGaps(in, list)
 }

@@ -1,7 +1,8 @@
 package gompressor
 
 // Deduplicate will find segments that are identical, besides position, and merge them.
-func Deduplicate(list *LinkedList[Segment]) {
+func Deduplicate(list *LinkedList[Segment]) int64 {
+	var count int64
 	cur := list.Head
 	for {
 		if cur == nil {
@@ -17,6 +18,7 @@ func Deduplicate(list *LinkedList[Segment]) {
 			if curValue.CanMerge(iterValue) {
 				curSize := curValue.GetCompressedSize()
 				iterSize := curValue.GetCompressedSize()
+				count++
 				// Merge into the node that is saving more space.
 				if curSize < iterSize {
 					curValue.AppendPos(iterValue.Pos)
@@ -32,4 +34,5 @@ func Deduplicate(list *LinkedList[Segment]) {
 	nextcur:
 		cur = cur.Next
 	}
+	return count
 }

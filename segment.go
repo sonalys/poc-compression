@@ -77,15 +77,13 @@ func (s *Segment) GetCompressionGains() int64 {
 }
 
 // NewSegment creates a new segment.
-func NewSegment(t SegmentType, pos int64, buffer []byte) *Segment {
+func NewSegment(t SegmentType, buffer []byte, pos ...int64) *Segment {
 	resp := &Segment{
 		Type:   t,
 		Buffer: buffer,
-		MaxPos: pos,
 		Repeat: 1,
-		Pos:    []int64{pos},
 	}
-	return resp
+	return resp.AppendPos(pos)
 }
 
 // NewSegment creates a new segment.
