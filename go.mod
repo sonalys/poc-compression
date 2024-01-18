@@ -6,6 +6,7 @@ require (
 	github.com/bits-and-blooms/bloom/v3 v3.6.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3
+	golang.org/x/sync v0.6.0
 )
 
 require (

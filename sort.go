@@ -5,10 +5,10 @@ import "sort"
 type SegmentPosMap struct {
 	Pos int64
 	*Segment
-	Entry *ListEntry[Segment]
+	Entry *ListEntry[*Segment]
 }
 
-func sortAndFilterSegments(list *LinkedList[Segment], sortType bool, filters ...func(*ListEntry[Segment]) bool) []SegmentPosMap {
+func sortAndFilterSegments(list *LinkedList[*Segment], sortType bool, filters ...func(*ListEntry[*Segment]) bool) []SegmentPosMap {
 	out := make([]SegmentPosMap, 0, list.Len)
 	cur := list.Head
 	for {

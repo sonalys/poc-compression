@@ -3,10 +3,11 @@ package gompressor
 // TODO: Test bloom-filters for regenerating a byte dictionary
 // try to create 2 or 3 filters, multiplying by prime numbers to get more precision.
 
-func FillSegmentGaps(buf []byte, list *LinkedList[Segment]) []byte {
+func FillSegmentGaps(buf []byte, list *LinkedList[*Segment]) []byte {
+	// t1 := time.Now()
 	var prev int64
 	out := make([]byte, 0, len(buf))
-	orderedSegments := sortAndFilterSegments(list, true, func(le *ListEntry[Segment]) bool {
+	orderedSegments := sortAndFilterSegments(list, true, func(le *ListEntry[*Segment]) bool {
 		if le.Value.GetCompressionGains() <= 0 {
 			le.Remove()
 			return false
@@ -14,28 +15,34 @@ func FillSegmentGaps(buf []byte, list *LinkedList[Segment]) []byte {
 		return true
 	})
 	for _, cur := range orderedSegments {
-		if prev > cur.Pos {
-			panic("decompression should be linear")
-		}
+		// if prev > cur.Pos {
+		// 	panic("decompression should be linear")
+		// }
 		out = append(out, buf[prev:cur.Pos]...)
 		prev = cur.Pos + int64(len(cur.Buffer))*int64(cur.Repeat)
 	}
 	out = append(out, buf[prev:]...)
+	// log.Debug().
+	// 	Str("duration", time.Since(t1).String()).
+	// 	Int("outSize", len(out)).
+	// 	Int("segCount", list.Len).
+	// 	Msg("finishing fill segment gaps")
 	return out
 }
 
 func Compress(buf []byte) *Block {
 	size := int64(len(buf))
-	layers := []func([]byte) (*LinkedList[Segment], []byte){
+	// log.Debug().Int64("size", size).Msg("initializing compression")
+	layers := []func([]byte) (*LinkedList[*Segment], []byte){
 		CreateSameCharSegments,
-		CreateRepeatingSegments2,
+		CreateRepeatingSegments,
 	}
-	list := NewLinkedList[Segment]()
+	list := NewLinkedList[*Segment]()
 	for _, compressionLayer := range layers {
-		newSegments, out := compressionLayer(buf)
-		buf = out
+		var newSegments *LinkedList[*Segment]
 		// note that we are changing buf through each layer.
 		// that means different coordinates for each layer.
+		newSegments, buf = compressionLayer(buf)
 		list.Append(newSegments.Head)
 	}
 	// Don't run any optimizations outside, because the coordinates of each layer are relative.

@@ -1,6 +1,8 @@
 package gompressor
 
-import "math"
+import (
+	"math"
+)
 
 func CountBytes(in []byte) (repetition []uint) {
 	repetition = make([]uint, 256)
@@ -57,6 +59,18 @@ func MapBytePos(in []byte) (repetition [256][]int64) {
 		}
 		repetition[char] = append(repetition[char], int64(pos))
 	}
+	return
+}
+
+func MapBytePosList(in []byte) (repetition [256]*LinkedList[int64]) {
+	// t1 := time.Now()
+	for pos, char := range in {
+		if repetition[char] == nil {
+			repetition[char] = &LinkedList[int64]{}
+		}
+		repetition[char].AppendValue(int64(pos))
+	}
+	// log.Debug().Str("duration", time.Since(t1).String()).Msg("byte pos indexing finished")
 	return
 }
 

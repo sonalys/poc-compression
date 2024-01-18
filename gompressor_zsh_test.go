@@ -17,11 +17,16 @@ var paths = []string{
 }
 
 func Test_compressZSH(t *testing.T) {
+	// zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	// log.Logger = log.Output(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
+	// 	w.NoColor = true
+	// 	w.FieldsExclude = append(w.FieldsExclude, "time")
+	// }))
 	in, err := os.ReadFile(paths[0])
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
-	in = in[:400000]
+	in = in[:100000]
 	block := Compress(in)
 	compressedOut := Encode(block)
 	compressedSize := int64(len(compressedOut))

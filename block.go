@@ -6,6 +6,6 @@ type BlockSize = constraints.Unsigned
 
 type Block struct {
 	OriginalSize int64
-	List         *LinkedList[Segment]
+	List         *LinkedList[*Segment]
 	Buffer       []byte
 }

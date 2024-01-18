@@ -5,7 +5,7 @@ func Decode(in []byte) (out *Block, err error) {
 	var pos int64
 	out = &Block{
 		OriginalSize: int64(decoder.Uint64(in)),
-		List:         &LinkedList[Segment]{},
+		List:         &LinkedList[*Segment]{},
 	}
 	bufLen := int64(decoder.Uint64(in[8:]))
 	pos += 16

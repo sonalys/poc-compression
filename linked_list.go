@@ -1,18 +1,35 @@
 package gompressor
 
-type ListEntry[T any] struct {
-	Value      *T
+type ListEntry[T comparable] struct {
+	Value      T
 	Prev, Next *ListEntry[T]
 	Ref        *LinkedList[T]
 }
 
-type LinkedList[T any] struct {
+type LinkedList[T comparable] struct {
 	Head, Tail *ListEntry[T]
 	Len        int
 }
 
-func NewLinkedList[T any]() *LinkedList[T] {
+func NewLinkedList[T comparable]() *LinkedList[T] {
 	return &LinkedList[T]{}
+}
+
+func (l *LinkedList[T]) Find(value T) *ListEntry[T] {
+	if l == nil {
+		return nil
+	}
+	cur := l.Head
+	for {
+		if cur == nil {
+			break
+		}
+		if cur.Value == value {
+			return cur
+		}
+		cur = cur.Next
+	}
+	return nil
 }
 
 // Append adds a segment after the current.
@@ -35,13 +52,14 @@ func (l *LinkedList[T]) Append(next *ListEntry[T]) *LinkedList[T] {
 		if cur == nil {
 			break
 		}
+		l.Len++
 		cur.Ref = l
 		cur = cur.Next
 	}
 	return l
 }
 
-func (l *LinkedList[T]) AppendValue(value *T) *LinkedList[T] {
+func (l *LinkedList[T]) AppendValue(value T) *LinkedList[T] {
 	entry := &ListEntry[T]{
 		Value: value,
 		Ref:   l,
@@ -54,6 +72,7 @@ func (l *LinkedList[T]) AppendValue(value *T) *LinkedList[T] {
 		l.Tail.Next = entry
 	}
 	l.Tail = entry
+	l.Len++
 	return l
 }
 
@@ -70,6 +89,23 @@ func (l *ListEntry[T]) Remove() {
 	if l.Ref.Tail == l {
 		l.Ref.Tail = l.Prev
 	}
+	l.Ref.Len--
+}
+
+func (l *ListEntry[T]) Find(value T) *ListEntry[T] {
+	if l == nil {
+		return nil
+	}
+	cur := l
+	for {
+		if cur == nil {
+			break
+		}
+		if cur.Value == value {
+			return cur
+		}
+	}
+	return nil
 }
 
 // Append adds a segment after the current.
@@ -84,6 +120,7 @@ func (l *ListEntry[T]) Append(next *ListEntry[T]) *ListEntry[T] {
 		if cur == nil {
 			break
 		}
+		l.Ref.Len++
 		cur.Ref = l.Ref
 		cur = cur.Next
 	}
