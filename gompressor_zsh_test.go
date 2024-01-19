@@ -26,32 +26,35 @@ func Test_compressZSH(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
-	in = in[:100000]
+	// in = in[:100000]
 	block := Compress(in)
 	compressedOut := Encode(block)
-	compressedSize := int64(len(compressedOut))
+	compressedSize := int(len(compressedOut))
 
 	t.Run("reconstruction", func(t *testing.T) {
 		block2, err := Decode(compressedOut)
 		require.NoError(t, err)
 		out := Decompress(block2)
 		require.Equal(t, len(in), len(out))
+		for i := range in {
+			require.Equal(t, in[i], out[i], i)
+		}
 		require.True(t, bytes.Equal(in, out))
 	})
 
 	t.Run("statistics", func(t *testing.T) {
 		var segmentCount int
 		var minRepeat, maxRepeat int = math.MaxInt, 0
-		var minGain, maxGain int64 = math.MaxInt64, 0
-		var minBufferSize int64 = math.MaxInt64
+		var minGain, maxGain int = math.MaxInt, 0
+		var minBufferSize int = math.MaxInt
 		cur := block.List.Head
 		for {
 			if cur == nil {
 				break
 			}
 			segmentCount++
-			if bufSize := int64(len(cur.Value.Buffer)); bufSize*int64(cur.Value.Repeat) < minBufferSize {
-				minBufferSize = bufSize * int64(cur.Value.Repeat)
+			if bufSize := int(len(cur.Value.Buffer)); bufSize*int(cur.Value.Repeat) < minBufferSize {
+				minBufferSize = bufSize * int(cur.Value.Repeat)
 			}
 			if repeat := int(cur.Value.Repeat); repeat > maxRepeat {
 				maxRepeat = repeat
@@ -78,8 +81,8 @@ maxGain:		%d bytes
 `,
 			ratio,
 			compressedSize,
-			int64(len(in)),
-			int64(len(in))-compressedSize,
+			int(len(in)),
+			int(len(in))-compressedSize,
 			segmentCount,
 			minRepeat,
 			maxRepeat,

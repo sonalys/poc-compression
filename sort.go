@@ -3,7 +3,7 @@ package gompressor
 import "sort"
 
 type SegmentPosMap struct {
-	Pos int64
+	Pos int
 	*Segment
 	Entry *ListEntry[*Segment]
 }

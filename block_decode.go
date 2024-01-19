@@ -1,13 +1,13 @@
 package gompressor
 
 func Decode(in []byte) (out *Block, err error) {
-	lenIn := int64(len(in))
-	var pos int64
+	lenIn := len(in)
+	var pos int
 	out = &Block{
-		OriginalSize: int64(decoder.Uint64(in)),
+		OriginalSize: int(decoder.Uint64(in)),
 		List:         &LinkedList[*Segment]{},
 	}
-	bufLen := int64(decoder.Uint64(in[8:]))
+	bufLen := int(decoder.Uint64(in[8:]))
 	pos += 16
 	out.Buffer, pos = in[pos:pos+bufLen], pos+bufLen
 	for {

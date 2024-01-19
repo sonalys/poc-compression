@@ -1,173 +1,156 @@
 package gompressor
 
-import (
-	"bytes"
-	"context"
-	"sync"
+import "math"
 
-	"golang.org/x/sync/semaphore"
-)
-
-// getEndOffset grows a byte group from the end position, finding the largest group possible.
-// this group must repeat in curPos and nextPos.
-func getEndOffset(buf []byte, curPos, nextPos int64) int64 {
-	var endOffset int64 = 0
-	bufLen := int64(len(buf))
-	for newEnd := endOffset + 1; nextPos+newEnd < bufLen; newEnd++ {
-		if buf[curPos+newEnd] == buf[nextPos+newEnd] {
-			endOffset = newEnd
-			continue
-		}
-		break
-	}
-	return endOffset
+func getGain(matched []int, size int) int {
+	matchedLen := len(matched)
+	maxPos := matched[len(matched)-1]
+	return matchedLen*size - GetCompressedSize(TypeRepeatingGroup, 1, maxPos, matchedLen, size)
 }
 
-// matchRepeatingGroup finds all other positions from the same byte value that also repeat the group found.
-func matchRepeatingGroup(cur *ListEntry[int64], buf, cmp []byte, endOffset int64) (resp []int64) {
-	bufLen := int64(len(buf))
-	wg := sync.WaitGroup{}
-	lock := sync.Mutex{}
-	sem := semaphore.NewWeighted(10)
-	for {
-		if cur == nil {
+func growIterator(v int) int {
+	if v > 0 {
+		return v + 1
+	}
+	return v - 1
+}
+
+func cmp(buf []byte, pos, next, offset int) bool {
+	bufLen := len(buf)
+	if offset > 0 {
+		if next+offset >= bufLen {
+			return false
+		}
+	} else if pos+offset < 0 {
+		return false
+	}
+	return buf[pos+offset] == buf[next+offset]
+}
+
+func abs(v int) int {
+	return (v>>63 | 1) * v
+}
+
+func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevSize int) ([]int, int, int) {
+	var bestMatched []int
+	var bestOffset int
+	var bestGain int = math.MinInt
+	// We keep 3 different levels of records here,
+	// Best level, the best gain we could achieve, for which offset and which positions.
+	// Offset level, the best gain and positions for all possible start positions.
+	// Start level, the best positions and gain given a fixed start position.
+	for offset := offset; ; offset = growIterator(offset) {
+		var offsetGain int = math.MinInt
+		var offsetMatched []int
+		absOffset := abs(offset)
+		for i := 0; i < len(posList); i++ {
+			curPos := posList[i]
+			if collision[curPos] {
+				continue
+			}
+			startMatched := make([]int, 0, 100)
+			startMatched = append(startMatched, curPos)
+			for j := i + 1; j < len(posList); j++ {
+				nextPos := posList[j]
+				if collision[nextPos] || nextPos-curPos < absOffset {
+					continue
+				}
+				if cmp(buf, curPos, nextPos, offset) {
+					startMatched = append(startMatched, nextPos)
+				}
+			}
+			if len(startMatched) < 2 {
+				continue
+			}
+			if gain := getGain(startMatched, prevSize+absOffset); gain > offsetGain {
+				offsetGain = gain
+				offsetMatched = startMatched
+			}
+		}
+		if offsetGain <= bestGain {
 			break
 		}
-		wg.Add(1)
-		sem.Acquire(context.Background(), 1)
-		go func(cur *ListEntry[int64]) {
-			defer sem.Release(1)
-			defer wg.Done()
-			pos := cur.Value
-			endPos := pos + endOffset
-			startPos := pos
-			// Prevent start and end positions from panicking,
-			// also prevents position intersection from previous position with the current.
-			if startPos > bufLen || endPos > bufLen {
-				return
-			}
-			if bytes.Equal(buf[startPos:endPos], cmp) {
-				lock.Lock()
-				resp = append(resp, startPos)
-				lock.Unlock()
-			}
-		}(cur)
-		cur = cur.Next
+		bestGain = offsetGain
+		bestMatched = offsetMatched
+		bestOffset = offset
+		posList = offsetMatched
 	}
-	wg.Wait()
-	return
+	if bestGain <= 0 {
+		return posList, 0, 0
+	}
+	return bestMatched, bestOffset, bestGain
 }
 
-// func findBytePosIndex(list []int64, value int64) int {
-// 	lower := 0
-// 	higher := len(list) - 1
-// 	for {
-// 		if lower > higher {
-// 			return -1
-// 		}
-// 		middle := lower + (higher-lower)/2
-// 		// Check if x is present at mid
-// 		if list[middle] == value {
-// 			return middle
-// 		} else if list[middle] < value {
-// 			lower = middle + 1
-// 		} else {
-// 			higher = middle - 1
-// 		}
-// 	}
-// }
+func detectOffsetCollision(collision []bool, pos, size int) bool {
+	for offset := 0; offset < size; offset++ {
+		if collision[pos+offset] {
+			return true
+		}
+	}
+	return false
+}
+
+func registerBytes(collision []bool, posList []int, size int) {
+	for _, pos := range posList {
+		for offset := 0; offset < size; offset++ {
+			collision[pos+offset] = true
+		}
+	}
+}
+
+func appendUncollidedPos(posList []int, collision []bool, seg *Segment, startOffset, size int) {
+	for i := 0; i < len(posList); i++ {
+		pos := posList[i] + startOffset
+		if detectOffsetCollision(collision, pos, size) {
+			continue
+		}
+		if i == 0 || posList[i]-posList[i-1] > size {
+			seg.AppendPos(pos)
+		}
+	}
+}
 
 // CreateRepeatingSegments should linearly detect repeating groups, without overlapping.
 func CreateRepeatingSegments(buf []byte) (*LinkedList[*Segment], []byte) {
-	// t1 := time.Now()
-	bufLen := int64(len(buf))
-	minSize := int64(3)
+	bufLen := len(buf)
+	minSize := 3
+	byteMap := MapBytePos(buf)
+	bytePop := GetBytePopularity(byteMap)
+	collision := make([]bool, bufLen)
 	list := NewLinkedList[*Segment]()
-	byteMap := MapBytePosList(buf)
-	collisionCheck := make([]*Segment, len(buf))
-	for curPos := int64(0); curPos < bufLen; curPos++ {
-		// percentage := (float64(curPos) / float64(bufLen)) * 100
-		// log.Debug().Msgf("progress at %.2f%%", percentage)
-		char := buf[curPos]
-		bytePosList := byteMap[char]
-		if seg := collisionCheck[curPos]; seg != nil {
-			curPos += int64(len(seg.Buffer))*int64(seg.Repeat) - 1
+	var charCount int
+	// We start by searching groups by the less frequent bytes.
+	for _, char := range bytePop {
+		posList := byteMap[char]
+		if len(posList) == 0 {
 			continue
 		}
-		posIndex := bytePosList.Find(curPos)
-		next := posIndex
-	nextBreak:
-		for {
-			next = next.Next
-			if next == nil {
-				break
-			}
-			nextPos := next.Value
-			if seg := collisionCheck[nextPos]; seg != nil {
-				for i := 0; i < int(len(seg.Buffer))*int(seg.Repeat)-1; i++ {
-					next = next.Next
-					if next == nil {
-						break nextBreak
-					}
-				}
-				continue
-			}
-			endOffset := getEndOffset(buf, curPos, nextPos)
-			// Prevent positions too close to form a group.
-			// Also prevents forming a group that intersects it's positions.
-			if endOffset < minSize || endOffset > nextPos-curPos {
-				continue
-			}
-			groupEnd := curPos + endOffset
-			groupBuf := buf[curPos:groupEnd]
-			// repeating group of minSize found in curPos and nextPos.
-			matched := matchRepeatingGroup(next, buf, groupBuf, endOffset)
-			matched = append(matched, curPos)
-			nonCollidingPos := make([]int64, 0, len(matched))
-			var bytesToRemove [256][]int64
-		nextPos:
-			for _, pos := range matched {
-				// First check for byte collision with other segments.
-				for k := range groupBuf {
-					charPos := pos + int64(k)
-					if collisionCheck[charPos] != nil {
-						continue nextPos
-					}
-				}
-				// No byte collisions means we can create our segment without any further issues.
-				// So here register all these bytes to be removed from the indexing.
-				for k, char := range groupBuf {
-					charPos := pos + int64(k)
-					bytesToRemove[char] = append(bytesToRemove[char], charPos)
-				}
-				// Position had no collisions, so it can be added to the segment.
-				nonCollidingPos = append(nonCollidingPos, pos)
-			}
-			if len(nonCollidingPos) == 0 {
-				continue
-			}
-			cur := NewSegment(TypeRepeatingGroup, groupBuf, nonCollidingPos...)
-			// If the segment is net negative, it's not worth to add it.
-			if cur.GetCompressionGains() <= 0 {
-				continue
-			}
-			for char, posList := range bytesToRemove {
-				for _, pos := range posList {
-					// if posIndex == -1 {
-					// 	panic("same byte mapped twice in the same segment")
-					// }
-					// byteMap[char] = append(byteMap[char][:posIndex], byteMap[char][posIndex+1:]...)
-					byteMap[char].Find(pos).Remove()
-					collisionCheck[pos] = cur
-				}
-			}
-			// Adds the segment to the list and remove all the bytes used from indexing.
-			list.AppendValue(cur)
-			// We can skip this much position because it already contains a group.
-			curPos = groupEnd
-			break
+		var startOffset, endOffset int
+		var startGain, endGain int
+		var bestStartList, bestEndList []int
+		bestStartList, startOffset, startGain = GrowOffset(buf, collision, posList, -1, 1)
+		bestEndList, endOffset, endGain = GrowOffset(buf, collision, posList, 1, 1)
+		if startGain > endGain {
+			posList, endOffset, _ = GrowOffset(buf, collision, bestStartList, 1, abs(startOffset)+1)
+		} else {
+			posList, startOffset, _ = GrowOffset(buf, collision, bestEndList, -1, abs(endOffset)+1)
 		}
+
+		size := endOffset - startOffset
+		if size < minSize || len(posList) < 2 {
+			continue
+		}
+		startPos := posList[0] + startOffset
+		endPos := posList[0] + endOffset
+		seg := NewSegment(TypeRepeatingGroup, buf[startPos:endPos])
+		appendUncollidedPos(posList, collision, seg, startOffset, size)
+		if seg.GetCompressionGains() <= 0 {
+			continue
+		}
+		charCount += seg.GetCompressionGains()
+		// verifySegment(buf, seg)
+		registerBytes(collision, seg.Pos, size)
+		list.AppendValue(seg)
 	}
-	// log.Debug().Str("duration", time.Since(t1).String()).Int("segCount", list.Len).Msg("finishing repeatingSegments")
 	return list, FillSegmentGaps(buf, list)
 }

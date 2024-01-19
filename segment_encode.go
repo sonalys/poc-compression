@@ -3,8 +3,8 @@ package gompressor
 import "math"
 
 func (s *Segment) Encode() []byte {
-	bufLen := int64(len(s.Buffer))
-	posLen := int64(len(s.Pos))
+	bufLen := int(len(s.Buffer))
+	posLen := int(len(s.Pos))
 	// allocate buffers.
 	buffer := make([]byte, 0, s.GetCompressedSize())
 	meta := NewMetadata().SetType(s.Type)
@@ -45,7 +45,7 @@ func (s *Segment) Encode() []byte {
 	buffer = append(buffer, meta.ToByte())
 	if s.Type == TypeRepeatSameChar {
 		if s.Repeat > math.MaxUint8 {
-			buffer = encoder.AppendUint16(buffer, s.Repeat)
+			buffer = encoder.AppendUint16(buffer, uint16(s.Repeat))
 		} else {
 			buffer = append(buffer, byte(s.Repeat))
 		}

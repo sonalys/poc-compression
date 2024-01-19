@@ -5,7 +5,7 @@ package gompressor
 
 func FillSegmentGaps(buf []byte, list *LinkedList[*Segment]) []byte {
 	// t1 := time.Now()
-	var prev int64
+	var prev int
 	out := make([]byte, 0, len(buf))
 	orderedSegments := sortAndFilterSegments(list, true, func(le *ListEntry[*Segment]) bool {
 		if le.Value.GetCompressionGains() <= 0 {
@@ -15,11 +15,11 @@ func FillSegmentGaps(buf []byte, list *LinkedList[*Segment]) []byte {
 		return true
 	})
 	for _, cur := range orderedSegments {
-		// if prev > cur.Pos {
-		// 	panic("decompression should be linear")
-		// }
+		if prev > cur.Pos {
+			panic("decompression should be linear")
+		}
 		out = append(out, buf[prev:cur.Pos]...)
-		prev = cur.Pos + int64(len(cur.Buffer))*int64(cur.Repeat)
+		prev = cur.Pos + len(cur.Buffer)*int(cur.Repeat)
 	}
 	out = append(out, buf[prev:]...)
 	// log.Debug().
@@ -31,8 +31,8 @@ func FillSegmentGaps(buf []byte, list *LinkedList[*Segment]) []byte {
 }
 
 func Compress(buf []byte) *Block {
-	size := int64(len(buf))
-	// log.Debug().Int64("size", size).Msg("initializing compression")
+	size := len(buf)
+	// log.Debug().int("size", size).Msg("initializing compression")
 	layers := []func([]byte) (*LinkedList[*Segment], []byte){
 		CreateSameCharSegments,
 		CreateRepeatingSegments,

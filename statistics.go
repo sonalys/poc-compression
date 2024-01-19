@@ -2,6 +2,7 @@ package gompressor
 
 import (
 	"math"
+	"sort"
 )
 
 func CountBytes(in []byte) (repetition []uint) {
@@ -52,26 +53,48 @@ func CalculateSmallestDelta(input []byte, offset uint32, windowSize uint32) (uin
 	return pos, resp
 }
 
-func MapBytePos(in []byte) (repetition [256][]int64) {
+func MapBytePos(in []byte) (repetition [256][]int) {
 	for pos, char := range in {
 		if repetition[char] == nil {
-			repetition[char] = make([]int64, 0, 10)
+			repetition[char] = make([]int, 0, 10)
 		}
-		repetition[char] = append(repetition[char], int64(pos))
+		repetition[char] = append(repetition[char], int(pos))
 	}
 	return
 }
 
-func MapBytePosList(in []byte) (repetition [256]*LinkedList[int64]) {
+func MapBytePosList(in []byte) (repetition [256]*LinkedList[int]) {
 	// t1 := time.Now()
 	for pos, char := range in {
 		if repetition[char] == nil {
-			repetition[char] = &LinkedList[int64]{}
+			repetition[char] = &LinkedList[int]{}
 		}
-		repetition[char].AppendValue(int64(pos))
+		repetition[char].AppendValue(int(pos))
 	}
 	// log.Debug().Str("duration", time.Since(t1).String()).Msg("byte pos indexing finished")
 	return
+}
+
+func GetBytePopularity(in [256][]int) []int {
+	type bytePop struct {
+		Char byte
+		Len  int
+	}
+	var bytePopularity = make([]bytePop, 256)
+	for char := 0; char < 256; char++ {
+		bytePopularity[char] = bytePop{
+			Char: byte(char),
+			Len:  len(in[char]),
+		}
+	}
+	sort.Slice(bytePopularity, func(i, j int) bool {
+		return bytePopularity[i].Len < bytePopularity[j].Len
+	})
+	var result []int = make([]int, 256)
+	for i := range bytePopularity {
+		result[i] = int(bytePopularity[i].Char)
+	}
+	return result
 }
 
 func CalculateByteDensity(in []byte) (int, float64) {

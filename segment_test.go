@@ -11,11 +11,11 @@ func Test_GetCompressionGain(t *testing.T) {
 		seg := &Segment{
 			Type:   TypeRepeatSameChar,
 			Buffer: []byte{1, 2},
-			Pos:    []int64{0, 100},
+			Pos:    []int{0, 100},
 			Repeat: 50,
 		}
-		originalSize := int64(200)
-		compressedSize := int64(len(seg.Encode()))
+		originalSize := int(200)
+		compressedSize := int(len(seg.Encode()))
 		require.Equal(t, compressedSize, seg.GetCompressedSize())
 		gains := seg.GetCompressionGains()
 		require.Equal(t, originalSize-compressedSize, gains)
@@ -25,10 +25,10 @@ func Test_GetCompressionGain(t *testing.T) {
 		seg := &Segment{
 			Type:   TypeUncompressed,
 			Buffer: []byte{1, 2},
-			Pos:    []int64{0, 100},
+			Pos:    []int{0, 100},
 		}
-		originalSize := int64(4)
-		compressedSize := int64(len(seg.Encode()))
+		originalSize := int(4)
+		compressedSize := int(len(seg.Encode()))
 		require.Equal(t, compressedSize, seg.GetCompressedSize())
 		gains := seg.GetCompressionGains()
 		require.Equal(t, originalSize-compressedSize, gains)
@@ -38,11 +38,11 @@ func Test_GetCompressionGain(t *testing.T) {
 		seg := &Segment{
 			Type:   TypeRepeatingGroup,
 			Buffer: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-			Pos:    []int64{0, 100, 200},
+			Pos:    []int{0, 100, 200},
 			Repeat: 1,
 		}
-		originalSize := int64(30)
-		compressedSize := int64(len(seg.Encode()))
+		originalSize := int(30)
+		compressedSize := int(len(seg.Encode()))
 		require.Equal(t, compressedSize, seg.GetCompressedSize())
 		gains := seg.GetCompressionGains()
 		require.Equal(t, originalSize-compressedSize, gains)

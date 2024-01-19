@@ -8,9 +8,9 @@ import (
 type Segment struct {
 	Type   SegmentType
 	Buffer []byte
-	MaxPos int64
-	Pos    []int64
-	Repeat uint16
+	Pos    []int
+	MaxPos int
+	Repeat int
 }
 
 // Decompress returns the segment to it's decompressed state.
@@ -25,21 +25,21 @@ func (s *Segment) Decompress() []byte {
 	}
 }
 
-// GetOriginalSize returns decompressed size for the segment.
-func (s *Segment) GetOriginalSize() int64 {
-	posLen := int64(len(s.Pos))
-	bufLen := int64(len(s.Buffer))
-	switch s.Type {
+func GetOriginalSize(t SegmentType, repeat int, posLen, bufLen int) int {
+	switch t {
 	case TypeRepeatSameChar:
-		repeat := int64(s.Repeat)
-		originalSize := repeat * bufLen * posLen
-		return originalSize
+		return repeat * bufLen * posLen
 	default:
 		return bufLen * posLen
 	}
 }
 
-func getInt64SegmentBitSize(n int64) int64 {
+// GetOriginalSize returns decompressed size for the segment.
+func (s *Segment) GetOriginalSize() int {
+	return GetOriginalSize(s.Type, s.Repeat, len(s.Pos), len(s.Buffer))
+}
+
+func getintSegmentBitSize(n int) int {
 	switch {
 	case n > math.MaxUint32:
 		return 8
@@ -52,53 +52,65 @@ func getInt64SegmentBitSize(n int64) int64 {
 	}
 }
 
-func (s *Segment) GetCompressedSize() int64 {
-	posLen := int64(len(s.Pos))
-	bufLen := int64(len(s.Buffer))
-	var compressedSize int64 = 1
-	compressedSize += getInt64SegmentBitSize(bufLen)
-	compressedSize += getInt64SegmentBitSize(posLen)
-	if s.Type == TypeRepeatSameChar {
-		if s.Repeat > math.MaxUint8 {
+func GetCompressedSize(t SegmentType, repeat, maxPos, posLen, size int) int {
+	var compressedSize int = 1
+	compressedSize += getintSegmentBitSize(size)
+	compressedSize += getintSegmentBitSize(posLen)
+	if t == TypeRepeatSameChar {
+		if repeat > math.MaxUint8 {
 			compressedSize += 2
 		} else {
 			compressedSize += 1
 		}
 	}
-	maxPos := s.MaxPos
-	compressedSize += posLen * getInt64SegmentBitSize(maxPos)
-	compressedSize += bufLen
+	compressedSize += posLen * getintSegmentBitSize(maxPos)
+	compressedSize += size
 	return compressedSize
 }
 
+func (s *Segment) GetCompressedSize() int {
+	posLen := len(s.Pos)
+	bufLen := len(s.Buffer)
+	return GetCompressedSize(s.Type, s.Repeat, s.MaxPos, posLen, bufLen)
+}
+
+func (s *Segment) VerifySegment(buf []byte) {
+	size := len(s.Buffer)
+	for _, pos := range s.Pos {
+		for offset := 0; offset < size; offset++ {
+			if buf[pos+offset] != s.Buffer[offset] {
+				panic("segment position is not matching buffer")
+			}
+		}
+	}
+}
+
 // GetCompressionGains returns how many bytes this section is compressing.
-func (s *Segment) GetCompressionGains() int64 {
+func (s *Segment) GetCompressionGains() int {
 	return s.GetOriginalSize() - s.GetCompressedSize()
 }
 
 // NewSegment creates a new segment.
-func NewSegment(t SegmentType, buffer []byte, pos ...int64) *Segment {
+func NewSegment(t SegmentType, buffer []byte, pos ...int) *Segment {
 	resp := &Segment{
 		Type:   t,
 		Buffer: buffer,
 		Repeat: 1,
 	}
-	return resp.AppendPos(pos)
+	return resp.AppendPos(pos...)
 }
 
 // NewSegment creates a new segment.
-func NewRepeatSegment(pos int64, repeat uint16, buffer []byte) *Segment {
+func NewRepeatSegment(repeat int, buffer []byte, pos ...int) *Segment {
 	resp := &Segment{
 		Type:   TypeRepeatSameChar,
 		Buffer: buffer,
-		MaxPos: pos,
-		Pos:    []int64{pos},
 		Repeat: repeat,
 	}
-	return resp
+	return resp.AppendPos(pos...)
 }
 
-func (s *Segment) RemovePos(pos int64) {
+func (s *Segment) RemovePos(pos int) {
 	if s.MaxPos == pos {
 		s.MaxPos = Max(s.Pos)
 	}
@@ -112,7 +124,7 @@ func (s *Segment) RemovePos(pos int64) {
 
 // AppendPos will append all positions from pos into the current segment,
 // it will return error if it overflows the maximum capacity of the segment.
-func (s *Segment) AppendPos(pos []int64) *Segment {
+func (s *Segment) AppendPos(pos ...int) *Segment {
 	for i := range pos {
 		if pos[i] > s.MaxPos {
 			s.MaxPos = pos[i]
