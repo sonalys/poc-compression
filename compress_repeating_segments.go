@@ -1,6 +1,9 @@
 package gompressor
 
-import "math"
+import (
+	"math"
+	"sync"
+)
 
 func getGain(matched []int, size int) int {
 	matchedLen := len(matched)
@@ -31,6 +34,13 @@ func abs(v int) int {
 	return (v>>63 | 1) * v
 }
 
+var pool = sync.Pool{
+	New: func() any {
+		list := make([]int, 0, 100)
+		return &list
+	},
+}
+
 func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevSize int) ([]int, int, int) {
 	var bestMatched []int
 	var bestOffset int
@@ -48,7 +58,7 @@ func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevSize in
 			if collision[curPos] {
 				continue
 			}
-			startMatched := make([]int, 0, 100)
+			startMatched := (*pool.Get().(*[]int))[:0]
 			startMatched = append(startMatched, curPos)
 			for j := i + 1; j < len(posList); j++ {
 				nextPos := posList[j]
@@ -64,13 +74,17 @@ func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevSize in
 			}
 			if gain := getGain(startMatched, prevSize+absOffset); gain > offsetGain {
 				offsetGain = gain
+				pool.Put(&offsetMatched)
 				offsetMatched = startMatched
+				continue
 			}
+			pool.Put(&startMatched)
 		}
 		if offsetGain <= bestGain {
 			break
 		}
 		bestGain = offsetGain
+		pool.Put(&bestMatched)
 		bestMatched = offsetMatched
 		bestOffset = offset
 		posList = offsetMatched
@@ -126,18 +140,17 @@ func CreateRepeatingSegments(buf []byte) (*LinkedList[*Segment], []byte) {
 			continue
 		}
 		var startOffset, endOffset int
-		var startGain, endGain int
-		var bestStartList, bestEndList []int
-		bestStartList, startOffset, startGain = GrowOffset(buf, collision, posList, -1, 1)
-		bestEndList, endOffset, endGain = GrowOffset(buf, collision, posList, 1, 1)
-		if startGain > endGain {
-			posList, endOffset, _ = GrowOffset(buf, collision, bestStartList, 1, abs(startOffset)+1)
-		} else {
-			posList, startOffset, _ = GrowOffset(buf, collision, bestEndList, -1, abs(endOffset)+1)
-		}
-
+		// var startGain, endGain int
+		// var bestStartList, bestEndList []int
+		posList, startOffset, _ = GrowOffset(buf, collision, posList, -1, 1)
+		posList, endOffset, _ = GrowOffset(buf, collision, posList, 1, 1)
+		// if startGain > endGain {
+		// 	posList, endOffset, _ = GrowOffset(buf, collision, bestStartList, 1, abs(startOffset)+1)
+		// } else {
+		// 	posList, startOffset, _ = GrowOffset(buf, collision, bestEndList, -1, abs(endOffset)+1)
+		// }
 		size := endOffset - startOffset
-		if size < minSize || len(posList) < 2 {
+		if size < minSize {
 			continue
 		}
 		startPos := posList[0] + startOffset
@@ -148,7 +161,6 @@ func CreateRepeatingSegments(buf []byte) (*LinkedList[*Segment], []byte) {
 			continue
 		}
 		charCount += seg.GetCompressionGains()
-		// verifySegment(buf, seg)
 		registerBytes(collision, seg.Pos, size)
 		list.AppendValue(seg)
 	}

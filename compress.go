@@ -34,7 +34,7 @@ func Compress(buf []byte) *Block {
 	size := len(buf)
 	// log.Debug().int("size", size).Msg("initializing compression")
 	layers := []func([]byte) (*LinkedList[*Segment], []byte){
-		CreateSameCharSegments,
+		// CreateSameCharSegments,
 		CreateRepeatingSegments,
 	}
 	list := NewLinkedList[*Segment]()
