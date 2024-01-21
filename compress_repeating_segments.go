@@ -18,18 +18,6 @@ func growIterator(v int) int {
 	return v - 1
 }
 
-func cmp(buf []byte, pos, next, offset int) bool {
-	bufLen := len(buf)
-	if offset > 0 {
-		if next+offset >= bufLen {
-			return false
-		}
-	} else if pos+offset < 0 {
-		return false
-	}
-	return buf[pos+offset] == buf[next+offset]
-}
-
 func abs(v int) int {
 	return (v>>63 | 1) * v
 }
@@ -41,7 +29,9 @@ var pool = sync.Pool{
 	},
 }
 
-func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevSize int) ([]int, int, int) {
+func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevOffset int) ([]int, int) {
+	// Copy, so we are able to return original posList in case nothing matches.
+	localPosList := posList
 	var bestMatched []int
 	var bestOffset int
 	var bestGain int = math.MinInt
@@ -50,31 +40,42 @@ func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevSize in
 	// Offset level, the best gain and positions for all possible start positions.
 	// Start level, the best positions and gain given a fixed start position.
 	for offset := offset; ; offset = growIterator(offset) {
+		size := abs(offset-prevOffset) + 1
 		var offsetGain int = math.MinInt
 		var offsetMatched []int
-		absOffset := abs(offset)
-		for i := 0; i < len(posList); i++ {
-			curPos := posList[i]
+		for i := 0; i < len(localPosList)-1; i++ {
+			curPos := localPosList[i]
 			if collision[curPos] {
+				// No need to process this pos for any offset.
+				posList = posList[i+1:]
+				localPosList = posList
 				continue
 			}
+			if curPos+offset < 0 {
+				continue
+			}
+			// get pre-alloc slice from sync.pool and empty it.
 			startMatched := (*pool.Get().(*[]int))[:0]
 			startMatched = append(startMatched, curPos)
-			for j := i + 1; j < len(posList); j++ {
-				nextPos := posList[j]
-				if collision[nextPos] || nextPos-curPos < absOffset {
+			lastMatchedPos := curPos
+			for j := i + 1; j < len(localPosList); j++ {
+				nextPos := localPosList[j]
+				if collision[nextPos] || nextPos+offset >= len(buf) {
 					continue
 				}
-				if cmp(buf, curPos, nextPos, offset) {
+				if nextPos-lastMatchedPos <= size-1 {
+					continue
+				}
+				if buf[curPos+offset] == buf[nextPos+offset] {
+					lastMatchedPos = nextPos
 					startMatched = append(startMatched, nextPos)
 				}
 			}
 			if len(startMatched) < 2 {
 				continue
 			}
-			if gain := getGain(startMatched, prevSize+absOffset); gain > offsetGain {
+			if gain := getGain(startMatched, size); gain > offsetGain {
 				offsetGain = gain
-				pool.Put(&offsetMatched)
 				offsetMatched = startMatched
 				continue
 			}
@@ -84,15 +85,14 @@ func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevSize in
 			break
 		}
 		bestGain = offsetGain
-		pool.Put(&bestMatched)
 		bestMatched = offsetMatched
 		bestOffset = offset
-		posList = offsetMatched
+		localPosList = offsetMatched
 	}
-	if bestGain <= 0 {
-		return posList, 0, 0
+	if bestOffset == 0 {
+		return posList, 0
 	}
-	return bestMatched, bestOffset, bestGain
+	return bestMatched, bestOffset
 }
 
 func detectOffsetCollision(collision []bool, pos, size int) bool {
@@ -118,21 +118,17 @@ func appendUncollidedPos(posList []int, collision []bool, seg *Segment, startOff
 		if detectOffsetCollision(collision, pos, size) {
 			continue
 		}
-		if i == 0 || posList[i]-posList[i-1] > size {
-			seg.AppendPos(pos)
-		}
+		seg.AppendPos(pos)
 	}
 }
 
 // CreateRepeatingSegments should linearly detect repeating groups, without overlapping.
 func CreateRepeatingSegments(buf []byte) (*LinkedList[*Segment], []byte) {
 	bufLen := len(buf)
-	minSize := 3
 	byteMap := MapBytePos(buf)
 	bytePop := GetBytePopularity(byteMap)
 	collision := make([]bool, bufLen)
 	list := NewLinkedList[*Segment]()
-	var charCount int
 	// We start by searching groups by the less frequent bytes.
 	for _, char := range bytePop {
 		posList := byteMap[char]
@@ -140,27 +136,19 @@ func CreateRepeatingSegments(buf []byte) (*LinkedList[*Segment], []byte) {
 			continue
 		}
 		var startOffset, endOffset int
-		// var startGain, endGain int
-		// var bestStartList, bestEndList []int
-		posList, startOffset, _ = GrowOffset(buf, collision, posList, -1, 1)
-		posList, endOffset, _ = GrowOffset(buf, collision, posList, 1, 1)
-		// if startGain > endGain {
-		// 	posList, endOffset, _ = GrowOffset(buf, collision, bestStartList, 1, abs(startOffset)+1)
-		// } else {
-		// 	posList, startOffset, _ = GrowOffset(buf, collision, bestEndList, -1, abs(endOffset)+1)
-		// }
-		size := endOffset - startOffset
-		if size < minSize {
+		posList, startOffset = GrowOffset(buf, collision, posList, -1, 0)
+		posList, endOffset = GrowOffset(buf, collision, posList, 1, startOffset)
+		size := endOffset - startOffset + 1
+		if size < 2 || len(posList) < 2 {
 			continue
 		}
 		startPos := posList[0] + startOffset
-		endPos := posList[0] + endOffset
+		endPos := posList[0] + endOffset + 1
 		seg := NewSegment(TypeRepeatingGroup, buf[startPos:endPos])
 		appendUncollidedPos(posList, collision, seg, startOffset, size)
 		if seg.GetCompressionGains() <= 0 {
 			continue
 		}
-		charCount += seg.GetCompressionGains()
 		registerBytes(collision, seg.Pos, size)
 		list.AppendValue(seg)
 	}

@@ -88,7 +88,7 @@ func GetBytePopularity(in [256][]int) []int {
 		}
 	}
 	sort.Slice(bytePopularity, func(i, j int) bool {
-		return bytePopularity[i].Len < bytePopularity[j].Len
+		return bytePopularity[i].Len > bytePopularity[j].Len
 	})
 	var result []int = make([]int, 256)
 	for i := range bytePopularity {

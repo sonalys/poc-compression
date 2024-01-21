@@ -11,7 +11,10 @@ func DecodeSegment(b []byte) (*Segment, int) {
 	var pos int
 	flag, pos := Metadata(b[pos]), pos+1
 	cur := Segment{
-		Type: SegmentType(flag.Check(SegmentTypeMask)),
+		Type:       SegmentType(flag.Check(SegmentTypeMask)),
+		Repeat:     1,
+		BitMask:    0xff,
+		InvertMask: flag.GetInvertBitMask() != 0,
 	}
 	if cur.Type == TypeRepeatSameChar {
 		switch flag.GetRepSize() {
@@ -20,6 +23,8 @@ func DecodeSegment(b []byte) (*Segment, int) {
 		case 1:
 			cur.Repeat, pos = int(decoder.Uint16(b[pos:])), pos+2
 		}
+	} else {
+		cur.BitMask, pos = b[pos], pos+1
 	}
 	var posLen int16
 	switch flag.GetPosLenSize() {
@@ -36,17 +41,22 @@ func DecodeSegment(b []byte) (*Segment, int) {
 			cur.MaxPos = cur.Pos[i]
 		}
 	}
-	var bufLen int
 	switch flag.GetBufLenSize() {
 	case 0:
-		bufLen, pos = int(b[pos]), pos+1
+		cur.ByteCount, pos = int(b[pos]), pos+1
 	case 1:
-		bufLen, pos = int(decoder.Uint16(b[pos:])), pos+2
+		cur.ByteCount, pos = int(decoder.Uint16(b[pos:])), pos+2
 	case 2:
-		bufLen, pos = int(decoder.Uint32(b[pos:])), pos+4
+		cur.ByteCount, pos = int(decoder.Uint32(b[pos:])), pos+4
 	case 3:
-		bufLen, pos = int(decoder.Uint64(b[pos:])), pos+8
+		cur.ByteCount, pos = int(decoder.Uint64(b[pos:])), pos+8
 	}
-	cur.Buffer = b[pos : pos+bufLen]
-	return &cur, pos + bufLen
+	maskSize := Count1Bits(cur.BitMask)
+	if maskSize == 8 || maskSize == 0 {
+		cur.Buffer = b[pos : pos+cur.ByteCount]
+		return &cur, pos + cur.ByteCount
+	}
+	compLen := (maskSize*cur.ByteCount + 8 - 1) / 8
+	cur.Buffer, pos = b[pos:pos+compLen], pos+compLen
+	return &cur, pos
 }

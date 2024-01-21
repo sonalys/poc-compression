@@ -7,11 +7,11 @@ type (
 )
 
 const (
-	TypeUncompressed SegmentType = iota
-	TypeRepeatingGroup
+	TypeRepeatingGroup SegmentType = iota
 	TypeRepeatSameChar
 
-	SegmentTypeMask Mask = 0b11
+	SegmentTypeMask Mask = 0b1
+	BitMaskInvert   Mask = 0b1 << 1
 	RepeatSizeMask  Mask = 0b1 << 2
 	LenPosSizeMask  Mask = 0b1 << 3
 	PosSizeMask     Mask = 0b11 << 4
@@ -40,6 +40,14 @@ func (m Metadata) SetType(value SegmentType) Metadata {
 
 func (m Metadata) GetType() SegmentType {
 	return SegmentType(m.Check(SegmentTypeMask))
+}
+
+func (m Metadata) SetInvertBitMask(value byte) Metadata {
+	return m.Set(BitMaskInvert, byte(value)<<1)
+}
+
+func (m Metadata) GetInvertBitMask() byte {
+	return m.Check(BitMaskInvert) >> 1
 }
 
 func (m Metadata) SetRepSize(value byte) Metadata {

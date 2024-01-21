@@ -8,13 +8,8 @@ import (
 
 func Test_SegmentEncoding(t *testing.T) {
 	t.Run("uncompressed segment", func(t *testing.T) {
-		segment := &Segment{
-			Type:   TypeUncompressed,
-			Buffer: []byte{1, 2, 3},
-			Pos:    []int{1, 2, 3},
-		}
+		segment := NewSegment(TypeRepeatingGroup, []byte{255, 254, 244}, 1, 2, 3)
 		buffer := segment.Encode()
-
 		got, pos := DecodeSegment(buffer)
 		if pos != int(len(buffer)) {
 			t.Fatalf("decode returned wrong buffer position")
@@ -23,15 +18,8 @@ func Test_SegmentEncoding(t *testing.T) {
 	})
 
 	t.Run("repeat segment", func(t *testing.T) {
-		segment := &Segment{
-			Type:   TypeRepeatSameChar,
-			Buffer: []byte{1, 2, 3},
-			Pos:    []int{1, 2, 3},
-			Repeat: 2,
-		}
-
+		segment := NewRepeatSegment(2, []byte{1, 2, 3}, 1, 2, 3)
 		buffer := segment.Encode()
-
 		got, pos := DecodeSegment(buffer)
 		if pos != int(len(buffer)) {
 			t.Fatalf("decode returned wrong buffer position")

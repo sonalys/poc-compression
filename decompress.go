@@ -3,7 +3,8 @@ package gompressor
 func Decompress(b *Block) []byte {
 	out := make([]byte, b.OriginalSize)
 	copy(out, b.Buffer)
-	for _, cur := range sortAndFilterSegments(b.List, true) {
+	orderedSegments := sortAndFilterSegments(b.List, true)
+	for _, cur := range orderedSegments {
 		buf := cur.Decompress()
 		lenBuf := int(len(buf))
 		// right-shift data.

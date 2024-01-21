@@ -7,7 +7,7 @@ import (
 )
 
 func Test_encoding(t *testing.T) {
-	in := []byte{255, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 255}
+	in := []byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
 	expBlock := Compress(in)
 	expSerialized := Encode(expBlock)
 	gotBlock, err := Decode(expSerialized)

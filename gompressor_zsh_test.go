@@ -26,7 +26,7 @@ func Test_compressZSH(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
-	// in = in[:100000]
+	in = in[:math.MaxUint16]
 	block := Compress(in)
 	compressedOut := Encode(block)
 	compressedSize := int(len(compressedOut))
@@ -91,4 +91,24 @@ maxGain:		%d bytes
 			maxGain,
 		)
 	})
+}
+
+func Test_chunksZSH(t *testing.T) {
+	in, err := os.ReadFile(paths[0])
+	if err != nil {
+		t.Fatalf("failed to read file: %s", err)
+	}
+	var compressedSize int
+	chunkSize := math.MaxUint16
+	for i := 0; i < len(in); i += chunkSize {
+		end := i + chunkSize
+		if end > len(in) {
+			end = len(in)
+		}
+		buf := in[i:end]
+		block := Compress(buf)
+		compressedOut := Encode(block)
+		compressedSize += int(len(compressedOut))
+	}
+	t.Logf("ratio: %.2f (%d / %d)", float64(compressedSize)/float64(len(in)), compressedSize, len(in))
 }

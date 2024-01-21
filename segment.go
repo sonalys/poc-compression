@@ -6,18 +6,21 @@ import (
 )
 
 type Segment struct {
-	Type   SegmentType
-	Buffer []byte
-	Pos    []int
-	MaxPos int
-	Repeat int
+	Type       SegmentType
+	Buffer     []byte
+	ByteCount  int
+	Pos        []int
+	MaxPos     int
+	Repeat     int
+	BitMask    byte
+	InvertMask bool
 }
 
 // Decompress returns the segment to it's decompressed state.
 func (s *Segment) Decompress() []byte {
 	switch s.Type {
-	case TypeUncompressed, TypeRepeatingGroup:
-		return s.Buffer
+	case TypeRepeatingGroup:
+		return DecompressBuffer(s.BitMask, s.InvertMask, s.Buffer, s.ByteCount)
 	case TypeRepeatSameChar:
 		return bytes.Repeat(s.Buffer, int(s.Repeat))
 	default:
@@ -36,7 +39,7 @@ func GetOriginalSize(t SegmentType, repeat int, posLen, bufLen int) int {
 
 // GetOriginalSize returns decompressed size for the segment.
 func (s *Segment) GetOriginalSize() int {
-	return GetOriginalSize(s.Type, s.Repeat, len(s.Pos), len(s.Buffer))
+	return GetOriginalSize(s.Type, s.Repeat, len(s.Pos), s.ByteCount)
 }
 
 func getintSegmentBitSize(n int) int {
@@ -62,6 +65,8 @@ func GetCompressedSize(t SegmentType, repeat, maxPos, posLen, size int) int {
 		} else {
 			compressedSize += 1
 		}
+	} else {
+		compressedSize += 1
 	}
 	compressedSize += posLen * getintSegmentBitSize(maxPos)
 	compressedSize += size
@@ -74,17 +79,6 @@ func (s *Segment) GetCompressedSize() int {
 	return GetCompressedSize(s.Type, s.Repeat, s.MaxPos, posLen, bufLen)
 }
 
-func (s *Segment) VerifySegment(buf []byte) {
-	size := len(s.Buffer)
-	for _, pos := range s.Pos {
-		for offset := 0; offset < size; offset++ {
-			if buf[pos+offset] != s.Buffer[offset] {
-				panic("segment position is not matching buffer")
-			}
-		}
-	}
-}
-
 // GetCompressionGains returns how many bytes this section is compressing.
 func (s *Segment) GetCompressionGains() int {
 	return s.GetOriginalSize() - s.GetCompressedSize()
@@ -92,20 +86,29 @@ func (s *Segment) GetCompressionGains() int {
 
 // NewSegment creates a new segment.
 func NewSegment(t SegmentType, buffer []byte, pos ...int) *Segment {
-	resp := &Segment{
-		Type:   t,
-		Buffer: buffer,
-		Repeat: 1,
+	seg := &Segment{
+		Type:      t,
+		Buffer:    buffer,
+		ByteCount: len(buffer),
+		Repeat:    1,
 	}
-	return resp.AppendPos(pos...)
+	mask, invert, compressed := CompressBuffer(buffer)
+	if len(compressed) < len(buffer) {
+		seg.BitMask = mask
+		seg.InvertMask = invert
+		seg.Buffer = compressed
+	}
+	return seg.AppendPos(pos...)
 }
 
 // NewSegment creates a new segment.
 func NewRepeatSegment(repeat int, buffer []byte, pos ...int) *Segment {
 	resp := &Segment{
-		Type:   TypeRepeatSameChar,
-		Buffer: buffer,
-		Repeat: repeat,
+		Type:      TypeRepeatSameChar,
+		Buffer:    buffer,
+		ByteCount: len(buffer),
+		Repeat:    repeat,
+		BitMask:   0xff,
 	}
 	return resp.AppendPos(pos...)
 }
@@ -135,5 +138,8 @@ func (s *Segment) AppendPos(pos ...int) *Segment {
 }
 
 func (s *Segment) CanMerge(other *Segment) bool {
-	return len(s.Buffer) == len(other.Buffer) && s.Repeat == other.Repeat && bytes.Equal(s.Buffer, other.Buffer)
+	return s.ByteCount == other.ByteCount &&
+		s.Repeat == other.Repeat &&
+		s.BitMask == other.BitMask &&
+		bytes.Equal(s.Buffer, other.Buffer)
 }

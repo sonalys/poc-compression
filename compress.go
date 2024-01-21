@@ -1,10 +1,11 @@
 package gompressor
 
+import "fmt"
+
 // TODO: Test bloom-filters for regenerating a byte dictionary
 // try to create 2 or 3 filters, multiplying by prime numbers to get more precision.
 
 func FillSegmentGaps(buf []byte, list *LinkedList[*Segment]) []byte {
-	// t1 := time.Now()
 	var prev int
 	out := make([]byte, 0, len(buf))
 	orderedSegments := sortAndFilterSegments(list, true, func(le *ListEntry[*Segment]) bool {
@@ -14,25 +15,21 @@ func FillSegmentGaps(buf []byte, list *LinkedList[*Segment]) []byte {
 		}
 		return true
 	})
-	for _, cur := range orderedSegments {
+	for i, cur := range orderedSegments {
 		if prev > cur.Pos {
-			panic("decompression should be linear")
+			const mask = "decompression should be linear: pos %d and %d collided with size %d"
+			msg := fmt.Sprintf(mask, orderedSegments[i-1].Pos, cur.Pos, cur.ByteCount)
+			panic(msg)
 		}
 		out = append(out, buf[prev:cur.Pos]...)
-		prev = cur.Pos + len(cur.Buffer)*int(cur.Repeat)
+		prev = cur.Pos + cur.ByteCount*int(cur.Repeat)
 	}
 	out = append(out, buf[prev:]...)
-	// log.Debug().
-	// 	Str("duration", time.Since(t1).String()).
-	// 	Int("outSize", len(out)).
-	// 	Int("segCount", list.Len).
-	// 	Msg("finishing fill segment gaps")
 	return out
 }
 
 func Compress(buf []byte) *Block {
 	size := len(buf)
-	// log.Debug().int("size", size).Msg("initializing compression")
 	layers := []func([]byte) (*LinkedList[*Segment], []byte){
 		// CreateSameCharSegments,
 		CreateRepeatingSegments,
