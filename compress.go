@@ -31,7 +31,7 @@ func FillSegmentGaps(buf []byte, list *LinkedList[*Segment]) []byte {
 func Compress(buf []byte) *Block {
 	size := len(buf)
 	layers := []func([]byte) (*LinkedList[*Segment], []byte){
-		// CreateSameCharSegments,
+		CreateSameCharSegments,
 		CreateRepeatingSegments,
 	}
 	list := NewLinkedList[*Segment]()
