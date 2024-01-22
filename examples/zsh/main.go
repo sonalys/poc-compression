@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"time"
 
 	"github.com/sonalys/gompressor"
 )
@@ -16,6 +17,7 @@ var paths = []string{
 }
 
 func main() {
+	t1 := time.Now()
 	in, err := os.ReadFile(paths[0])
 	if err != nil {
 		panic("failed to read file")
@@ -42,12 +44,12 @@ func main() {
 	}
 
 	ratio := float64(compressedSize) / float64(len(in))
-	fmt.Printf(`
-ratio:			%.2f (%d / %d)
-compressed:	%d bytes
-segments:		%d
-minGain:		%d bytes
-maxGain:		%d bytes\n
+	fmt.Printf(`ratio:				%.2f (%d / %d)
+compressed:			%d bytes
+segments:			%d
+minGain:			%d bytes
+maxGain:			%d bytes
+took:				%s
 `,
 		ratio,
 		compressedSize,
@@ -56,5 +58,6 @@ maxGain:		%d bytes\n
 		segmentCount,
 		minGain,
 		maxGain,
+		time.Since(t1),
 	)
 }
