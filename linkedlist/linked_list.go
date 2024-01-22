@@ -1,4 +1,4 @@
-package gompressor
+package linkedlist
 
 type ListEntry[T comparable] struct {
 	Value      T

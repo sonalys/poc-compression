@@ -1,6 +1,14 @@
-package gompressor
+package compression
 
 import "bytes"
+
+func createMask(in []byte) byte {
+	var mask byte
+	for _, char := range in {
+		mask |= char
+	}
+	return mask
+}
 
 // Count1Bits counts how many 1 bits there are in a byte.
 // Returns between 0 and 8
@@ -10,6 +18,16 @@ func Count1Bits(v byte) int {
 		v = v & (v - 1)
 	}
 	return count
+}
+
+func GetMaskBits(mask byte) []int {
+	compressedBits := make([]int, 0, 8)
+	for n := 0; n < 8; n++ {
+		if mask&(1<<n) != 0 {
+			compressedBits = append(compressedBits, n)
+		}
+	}
+	return compressedBits
 }
 
 func CompressByte(compressBits []int, value byte) byte {
@@ -26,24 +44,6 @@ func DecompressByte(compressBits []int, value byte) byte {
 		resp |= (value & (1 << i) << (n - i))
 	}
 	return resp
-}
-
-func GetMaskBits(mask byte) []int {
-	compressedBits := make([]int, 0, 8)
-	for n := 0; n < 8; n++ {
-		if mask&(1<<n) != 0 {
-			compressedBits = append(compressedBits, n)
-		}
-	}
-	return compressedBits
-}
-
-func createMask(in []byte) byte {
-	var mask byte
-	for _, char := range in {
-		mask |= char
-	}
-	return mask
 }
 
 func CompressBuffer(in []byte) (byte, bool, []byte) {

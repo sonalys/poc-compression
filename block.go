@@ -1,11 +1,15 @@
 package gompressor
 
-import "golang.org/x/exp/constraints"
+import (
+	"github.com/sonalys/gompressor/linkedlist"
+	"github.com/sonalys/gompressor/segments"
+	"golang.org/x/exp/constraints"
+)
 
 type BlockSize = constraints.Unsigned
 
 type Block struct {
 	OriginalSize int
-	List         *LinkedList[*Segment]
+	List         *linkedlist.LinkedList[segments.Segment]
 	Buffer       []byte
 }

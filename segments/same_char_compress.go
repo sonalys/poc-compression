@@ -1,7 +1,9 @@
-package gompressor
+package segments
 
 import (
 	"sort"
+
+	"github.com/sonalys/gompressor/linkedlist"
 )
 
 type sizePos struct {
@@ -35,7 +37,7 @@ func (sp *sizePos) getPrevious(i int) int {
 
 func getRepeatGain(i, posLen, size, maxPos int) int {
 	originalSize := size * posLen
-	compressedSize := GetCompressedSize(TypeRepeatSameChar, size, maxPos, posLen, 1)
+	compressedSize := calculateSameCharCompressedSize(posLen, size, maxPos)
 	return originalSize - compressedSize
 }
 
@@ -52,9 +54,9 @@ func shouldMerge(sp *sizePos, cur, other int) bool {
 	return curGain+otherGain < mergeGain
 }
 
-func CreateSameCharSegments(buf []byte) (*LinkedList[*Segment], []byte) {
+func CreateSameCharSegments(buf []byte) (*linkedlist.LinkedList[Segment], []byte) {
 	byteMap := MapBytePos(buf)
-	list := &LinkedList[*Segment]{}
+	list := &linkedlist.LinkedList[Segment]{}
 	for char, posList := range byteMap {
 		posBySize := make(map[int][]int, len(posList))
 		for i := 0; i < len(posList); i++ {
@@ -94,7 +96,7 @@ func CreateSameCharSegments(buf []byte) (*LinkedList[*Segment], []byte) {
 			if len(sp.positions[i]) == 0 {
 				continue
 			}
-			seg := NewRepeatSegment(size, []byte{byte(char)}, sp.positions[i]...)
+			seg := NewRepeatSegment(size, byte(char), sp.positions[i]...)
 			list.AppendValue(seg)
 		}
 	}

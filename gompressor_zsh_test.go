@@ -52,23 +52,13 @@ func Test_compressZSH(t *testing.T) {
 
 	t.Run("statistics", func(t *testing.T) {
 		var segmentCount int
-		var minRepeat, maxRepeat int = math.MaxInt, 0
 		var minGain, maxGain int = math.MaxInt, 0
-		var minBufferSize int = math.MaxInt
 		cur := block.List.Head
 		for {
 			if cur == nil {
 				break
 			}
 			segmentCount++
-			if bufSize := int(len(cur.Value.Buffer)); bufSize*int(cur.Value.Repeat) < minBufferSize {
-				minBufferSize = bufSize * int(cur.Value.Repeat)
-			}
-			if repeat := int(cur.Value.Repeat); repeat > maxRepeat {
-				maxRepeat = repeat
-			} else if repeat < minRepeat {
-				minRepeat = repeat
-			}
 			if gain := cur.Value.GetCompressionGains(); gain > maxGain {
 				maxGain = gain
 			} else if gain < minGain {
@@ -82,8 +72,6 @@ func Test_compressZSH(t *testing.T) {
 ratio:			%.2f (%d / %d)
 compressed:	%d bytes
 segments:		%d
-repeat:			%d min %d max
-minBuffer:	%d
 minGain:		%d bytes
 maxGain:		%d bytes
 `,
@@ -92,9 +80,6 @@ maxGain:		%d bytes
 			int(len(in)),
 			int(len(in))-compressedSize,
 			segmentCount,
-			minRepeat,
-			maxRepeat,
-			minBufferSize,
 			minGain,
 			maxGain,
 		)

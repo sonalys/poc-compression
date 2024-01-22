@@ -1,14 +1,16 @@
-package gompressor
+package segments
 
 import (
 	"math"
 	"sync"
+
+	"github.com/sonalys/gompressor/linkedlist"
 )
 
 func getGain(matched []int, size int) int {
 	matchedLen := len(matched)
 	maxPos := matched[len(matched)-1]
-	return matchedLen*size - GetCompressedSize(TypeRepeatingGroup, 1, maxPos, matchedLen, size)
+	return matchedLen*size - calculateGroupCompressedSize(matchedLen, size, maxPos)
 }
 
 func growIterator(v int) int {
@@ -112,23 +114,23 @@ func registerBytes(collision []bool, posList []int, size int) {
 	}
 }
 
-func appendUncollidedPos(posList []int, collision []bool, seg *Segment, startOffset, size int) {
+func appendUncollidedPos(posList []int, collision []bool, seg *SegmentGroup, startOffset, size int) {
 	for i := 0; i < len(posList); i++ {
 		pos := posList[i] + startOffset
 		if detectOffsetCollision(collision, pos, size) {
 			continue
 		}
-		seg.AppendPos(pos)
+		seg.appendPos(pos)
 	}
 }
 
-// CreateRepeatingSegments should linearly detect repeating groups, without overlapping.
-func CreateRepeatingSegments(buf []byte) (*LinkedList[*Segment], []byte) {
+// CreateGroupSegments should linearly detect repeating groups, without overlapping.
+func CreateGroupSegments(buf []byte) (*linkedlist.LinkedList[Segment], []byte) {
 	bufLen := len(buf)
 	byteMap := MapBytePos(buf)
 	bytePop := GetBytePopularity(byteMap)
 	collision := make([]bool, bufLen)
-	list := NewLinkedList[*Segment]()
+	list := linkedlist.NewLinkedList[Segment]()
 	// We start by searching groups by the less frequent bytes.
 	for _, char := range bytePop {
 		posList := byteMap[char]
@@ -144,13 +146,13 @@ func CreateRepeatingSegments(buf []byte) (*LinkedList[*Segment], []byte) {
 		}
 		startPos := posList[0] + startOffset
 		endPos := posList[0] + endOffset + 1
-		seg := NewSegment(TypeRepeatingGroup, buf[startPos:endPos])
-		appendUncollidedPos(posList, collision, seg, startOffset, size)
-		if seg.GetCompressionGains() <= 0 {
+		segment := NewGroupSegment(buf[startPos:endPos])
+		appendUncollidedPos(posList, collision, segment, startOffset, size)
+		if segment.GetCompressionGains() <= 0 {
 			continue
 		}
-		registerBytes(collision, seg.Pos, size)
-		list.AppendValue(seg)
+		registerBytes(collision, segment.pos, size)
+		list.AppendValue(segment)
 	}
 	return list, FillSegmentGaps(buf, list)
 }

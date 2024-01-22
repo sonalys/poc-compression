@@ -1,4 +1,4 @@
-package gompressor
+package compression
 
 import (
 	"bytes"

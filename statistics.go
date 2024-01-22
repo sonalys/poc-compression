@@ -3,6 +3,8 @@ package gompressor
 import (
 	"math"
 	"sort"
+
+	"github.com/sonalys/gompressor/linkedlist"
 )
 
 func CountBytes(in []byte) (repetition []uint) {
@@ -63,11 +65,11 @@ func MapBytePos(in []byte) (repetition [256][]int) {
 	return
 }
 
-func MapBytePosList(in []byte) (repetition [256]*LinkedList[int]) {
+func MapBytePosList(in []byte) (repetition [256]*linkedlist.LinkedList[int]) {
 	// t1 := time.Now()
 	for pos, char := range in {
 		if repetition[char] == nil {
-			repetition[char] = &LinkedList[int]{}
+			repetition[char] = &linkedlist.LinkedList[int]{}
 		}
 		repetition[char].AppendValue(int(pos))
 	}

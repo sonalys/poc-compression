@@ -9,7 +9,6 @@ type (
 	SegmentType byte
 	MaxSize     byte
 
-	// TODO: implement meta specific per segment type.
 	MetaSameChar struct {
 		Type       SegmentType // 2 bits
 		SinglePos  bool        // 1 bit
@@ -35,7 +34,8 @@ const (
 )
 
 const (
-	TypeRepeatingGroup SegmentType = iota
+	TypeMasked SegmentType = iota
+	TypeRepeatingGroup
 	TypeRepeatSameChar
 )
 
