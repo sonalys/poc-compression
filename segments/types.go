@@ -13,7 +13,9 @@ const (
 	TypeMasked SegmentType = iota
 	TypeGroup
 	TypeSameChar
+)
 
+const (
 	MaxSizeUint8 MaxSize = iota
 	MaxSizeUint16
 	MaxSizeUint32

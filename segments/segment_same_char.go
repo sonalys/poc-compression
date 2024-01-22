@@ -96,6 +96,10 @@ func (s *SegmentSameChar) Encode() []byte {
 		PosSize:    NewMaxSize(s.maxPos),
 	}
 
+	if meta.RepeatSize >= 2 {
+		panic("fuck")
+	}
+
 	buffer = append(buffer, meta.ToByte())
 	buffer = encodingFunc[meta.RepeatSize](buffer, s.repeat)
 	if meta.SinglePos {
