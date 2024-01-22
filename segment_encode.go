@@ -20,8 +20,9 @@ func encodeSameChar(s *Segment) []byte {
 	buffer := make([]byte, 0, s.GetCompressedSize())
 	posLen := len(s.Pos)
 
-	meta := Meta{
+	meta := MetaSameChar{
 		Type:       s.Type,
+		SinglePos:  posLen == 1,
 		RepeatSize: NewMaxSize(s.Repeat),
 		PosLenSize: NewMaxSize(posLen),
 		PosSize:    NewMaxSize(s.MaxPos),
@@ -29,8 +30,12 @@ func encodeSameChar(s *Segment) []byte {
 
 	buffer = append(buffer, meta.ToByte())
 	buffer = encodingFunc[meta.RepeatSize](buffer, s.Repeat)
-	buffer = encodingFunc[meta.PosLenSize](buffer, posLen)
-	buffer = append(buffer, encodePos(s.MaxPos, s.Pos)...)
+	if meta.SinglePos {
+		buffer = encodingFunc[meta.PosSize](buffer, s.Pos[0])
+	} else {
+		buffer = encodingFunc[meta.PosLenSize](buffer, posLen)
+		buffer = append(buffer, encodePos(s.MaxPos, s.Pos)...)
+	}
 	buffer = append(buffer, s.Buffer[0])
 	return buffer
 }
@@ -39,12 +44,12 @@ func encodeRepeatingGroup(s *Segment) []byte {
 	buffer := make([]byte, 0, s.GetCompressedSize())
 	posLen := len(s.Pos)
 
-	meta := Meta{
-		Type:          s.Type,
-		InvertBitmask: s.InvertMask,
-		PosLenSize:    NewMaxSize(posLen),
-		PosSize:       NewMaxSize(s.MaxPos),
-		BufLenSize:    NewMaxSize(s.ByteCount),
+	meta := MetaRepeatGroup{
+		Type:       s.Type,
+		InvertMask: s.InvertMask,
+		PosLenSize: NewMaxSize(posLen),
+		PosSize:    NewMaxSize(s.MaxPos),
+		BufLenSize: NewMaxSize(s.ByteCount),
 	}
 
 	buffer = append(buffer, meta.ToByte())

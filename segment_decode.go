@@ -31,26 +31,32 @@ func decodePos(b []byte, pos int, posLenSize, posSize MaxSize) (int, int, []int)
 
 func decodeSameChar(b []byte) (*Segment, int) {
 	var pos int
-	meta, pos := NewMeta2(b[pos]), pos+1
+	meta, pos := NewSameCharMeta(b[pos]), pos+1
 	cur := Segment{
 		Type:      TypeRepeatSameChar,
 		ByteCount: 1,
 		BitMask:   0xff,
 	}
 	cur.Repeat, pos = decodeFunc[meta.RepeatSize](b, pos)
-	cur.MaxPos, pos, cur.Pos = decodePos(b, pos, meta.PosLenSize, meta.PosSize)
+	if meta.SinglePos {
+		var segPos int
+		segPos, pos = decodeFunc[meta.PosSize](b, pos)
+		cur.AppendPos(segPos)
+	} else {
+		cur.MaxPos, pos, cur.Pos = decodePos(b, pos, meta.PosLenSize, meta.PosSize)
+	}
 	cur.Buffer, pos = b[pos:pos+1], pos+1
 	return &cur, pos
 }
 
 func decodeRepeatingGroup(b []byte) (*Segment, int) {
 	var pos int
-	meta, pos := NewMeta2(b[pos]), pos+1
+	meta, pos := NewRepeatGroupMeta(b[pos]), pos+1
 	cur := Segment{
 		Type:       TypeRepeatingGroup,
 		Repeat:     1,
 		BitMask:    0xff,
-		InvertMask: meta.InvertBitmask,
+		InvertMask: meta.InvertMask,
 	}
 	cur.BitMask, pos = b[pos], pos+1
 	cur.MaxPos, pos, cur.Pos = decodePos(b, pos, meta.PosLenSize, meta.PosSize)

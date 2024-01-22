@@ -21,7 +21,7 @@ func Test_compressZSH(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)
 	}
-	in = in[:math.MaxUint16]
+	// in = in[:math.MaxUint16]
 	block := Compress(in)
 	compressedOut := Encode(block)
 	compressedSize := int(len(compressedOut))

@@ -9,26 +9,22 @@ type (
 	SegmentType byte
 	MaxSize     byte
 
-	Meta struct {
-		Type          SegmentType // 1 bit
-		InvertBitmask bool        // 1 bit
-		RepeatSize    MaxSize     // 1 bit
-		PosLenSize    MaxSize     // 1 bit
-		BufLenSize    MaxSize     // 2 bits
-		PosSize       MaxSize     // 2 bits
+	// TODO: implement meta specific per segment type.
+	MetaSameChar struct {
+		Type       SegmentType // 2 bits
+		SinglePos  bool        // 1 bit
+		RepeatSize MaxSize     // 1 bit
+		PosLenSize MaxSize     // 1 bit
+		PosSize    MaxSize     // 2 bits
 	}
 
-	// TODO: implement meta specific per segment type.
-	// SameCharMetadata struct {
-	// 	Type       SegmentType // 1 bit
-	// 	RepeatSize MaxSize     // 1 bit
-	// 	SinglePos  bool        // 1 bit
-	// }
-
-	// RepeatingGroupMetadata struct {
-	// 	Type          SegmentType // 1 bit
-	// 	BitMaskInvert bool        // 1 bit
-	// }
+	MetaRepeatGroup struct {
+		Type       SegmentType // 2 bits
+		InvertMask bool        // 1 bit
+		PosLenSize MaxSize     // 1 bit
+		BufLenSize MaxSize     // 2 bits
+		PosSize    MaxSize     // 2 bits
+	}
 )
 
 const (
@@ -67,18 +63,21 @@ func Bool2Byte(b bool) byte {
 	return 0
 }
 
-func NewMeta2(b byte) Meta {
-	return Meta{
-		Type:          SegmentType(b & 0b01),
-		InvertBitmask: Byte2Bool((b & (0b01 << 1) >> 1)),
-		RepeatSize:    MaxSize((b & (0b01 << 2) >> 2)),
-		PosLenSize:    MaxSize((b & (0b01 << 3) >> 3)),
-		PosSize:       MaxSize((b & (0b11 << 4) >> 4)),
-		BufLenSize:    MaxSize((b & (0b11 << 6) >> 6)),
+func getSegmentType(b byte) SegmentType {
+	return SegmentType(b & 0b11)
+}
+
+func NewSameCharMeta(b byte) MetaSameChar {
+	return MetaSameChar{
+		Type:       getSegmentType(b),
+		SinglePos:  Byte2Bool((b & (0b01 << 2) >> 2)),
+		RepeatSize: MaxSize((b & (0b01 << 3) >> 3)),
+		PosLenSize: MaxSize((b & (0b01 << 4) >> 4)),
+		PosSize:    MaxSize((b & (0b11 << 5) >> 5)),
 	}
 }
 
-func (m Meta) Validate() error {
+func (m MetaSameChar) Validate() error {
 	if m.RepeatSize > 1 {
 		return fmt.Errorf("repeat size is bigger than 2 bytes")
 	}
@@ -88,14 +87,43 @@ func (m Meta) Validate() error {
 	return nil
 }
 
-func (m Meta) ToByte() byte {
+func (m MetaSameChar) ToByte() byte {
 	if err := m.Validate(); err != nil {
 		panic(err.Error())
 	}
 	var resp byte
 	resp |= byte(m.Type)
-	resp |= Bool2Byte(m.InvertBitmask) << 1
-	resp |= byte(m.RepeatSize) << 2
+	resp |= Bool2Byte(m.SinglePos) << 2
+	resp |= byte(m.RepeatSize) << 3
+	resp |= byte(m.PosLenSize) << 4
+	resp |= byte(m.PosSize) << 5
+	return resp
+}
+
+func NewRepeatGroupMeta(b byte) MetaRepeatGroup {
+	return MetaRepeatGroup{
+		Type:       getSegmentType(b),
+		InvertMask: Byte2Bool((b & (0b01 << 2) >> 2)),
+		PosLenSize: MaxSize((b & (0b01 << 3) >> 3)),
+		PosSize:    MaxSize((b & (0b11 << 4) >> 4)),
+		BufLenSize: MaxSize((b & (0b11 << 5) >> 6)),
+	}
+}
+
+func (m MetaRepeatGroup) Validate() error {
+	if m.PosLenSize > 1 {
+		return fmt.Errorf("posLen is bigger than 2 bytes")
+	}
+	return nil
+}
+
+func (m MetaRepeatGroup) ToByte() byte {
+	if err := m.Validate(); err != nil {
+		panic(err.Error())
+	}
+	var resp byte
+	resp |= byte(m.Type)
+	resp |= Bool2Byte(m.InvertMask) << 2
 	resp |= byte(m.PosLenSize) << 3
 	resp |= byte(m.PosSize) << 4
 	resp |= byte(m.BufLenSize) << 6

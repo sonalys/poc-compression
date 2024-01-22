@@ -57,15 +57,18 @@ func getStorageByteSize(n int) int {
 
 func GetCompressedSize(t SegmentType, repeat, maxPos, posLen, size int) int {
 	var compressedSize int = 1
-	compressedSize += getStorageByteSize(size)
 	compressedSize += getStorageByteSize(posLen)
 	if t == TypeRepeatSameChar {
+		if posLen == 1 {
+			compressedSize -= 1
+		}
 		if repeat > math.MaxUint8 {
 			compressedSize += 2
 		} else {
 			compressedSize += 1
 		}
 	} else {
+		compressedSize += getStorageByteSize(size)
 		compressedSize += 1
 	}
 	compressedSize += posLen * getStorageByteSize(maxPos)

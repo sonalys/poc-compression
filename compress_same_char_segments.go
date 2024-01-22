@@ -69,7 +69,7 @@ func CreateSameCharSegments(buf []byte) (*LinkedList[*Segment], []byte) {
 				continue
 			}
 			posBySize[size] = append(posBySize[size], posList[i])
-			i += size - 1
+			i = j - 1
 		}
 		sp := &sizePos{
 			sizes:     make([]int, 0, len(posBySize)),
