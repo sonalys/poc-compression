@@ -24,7 +24,7 @@ func getMaskedGain(in []byte, pos int) (int, bool) {
 	}
 	originalSize := len(in)
 	compressedSize := calculateMaskedCompressedSize(mask, originalSize, pos)
-	return originalSize - compressedSize, true
+	return originalSize - compressedSize + 4, true
 }
 
 type windowInfo struct {
@@ -108,6 +108,9 @@ func CreateMaskedSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
 		bestGain := entry.gain
 		bestStart := entry.pos
 		bestEnd := bestStart + windowSize
+		if bestEnd > inLen {
+			bestEnd = inLen
+		}
 		bestStart = getBestStart(in, cur, bestStart, bestEnd, bestGain, windowSize)
 		bestEnd = getBestEnd(in, cur, bestStart, bestEnd, bestGain, windowSize)
 		if seg := NewMaskedSegment(WithBuffer(in[bestStart:bestEnd]), bestStart); seg.GetCompressionGains() > 0 {

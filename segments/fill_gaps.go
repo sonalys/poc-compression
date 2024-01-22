@@ -52,16 +52,18 @@ func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters 
 	return out
 }
 
+func filterGoodSegments(entry *ll.ListEntry[Segment]) bool {
+	if entry.Value.GetCompressionGains() <= 0 {
+		entry.Remove()
+		return false
+	}
+	return true
+}
+
 func FillSegmentGaps(in []byte, list *ll.LinkedList[Segment]) []byte {
 	var prev int
 	out := make([]byte, 0, len(in))
-	orderedSegments := SortAndFilterSegments(list, true, func(le *ll.ListEntry[Segment]) bool {
-		if le.Value.GetCompressionGains() <= 0 {
-			le.Remove()
-			return false
-		}
-		return true
-	})
+	orderedSegments := SortAndFilterSegments(list, true, filterGoodSegments)
 	for i, cur := range orderedSegments {
 		if prev > cur.Pos {
 			const mask = "decompression should be linear: pos %d and %d collided"
@@ -69,7 +71,8 @@ func FillSegmentGaps(in []byte, list *ll.LinkedList[Segment]) []byte {
 			panic(msg)
 		}
 		out = append(out, in[prev:cur.Pos]...)
-		prev = cur.Pos + cur.Segment.GetOriginalSize()/len(cur.Segment.GetPos())
+		originalSize := cur.Segment.GetOriginalSize() / len(cur.Segment.GetPos())
+		prev = cur.Pos + originalSize
 	}
 	out = append(out, in[prev:]...)
 	return out

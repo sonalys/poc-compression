@@ -29,6 +29,7 @@ func main() {
 
 	out := gompressor.Decompress(block)
 	if len(in) != len(out) {
+		// TODO: figure out why it doesn't work for 3 layers, but work for any 2 layers.
 		msg := fmt.Sprintf("output size is different. exp %d != got %d", len(in), len(out))
 		panic(msg)
 	}

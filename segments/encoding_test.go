@@ -8,13 +8,15 @@ import (
 
 func Test_SegmentEncoding(t *testing.T) {
 	t.Run("masked segment", func(t *testing.T) {
-		segment := NewMaskedSegment(WithBuffer([]byte{255, 254, 244}), 1)
+		buf := []byte{255, 254, 244}
+		segment := NewMaskedSegment(WithBuffer(buf), 1)
 		buffer := segment.Encode()
 		got, pos := DecodeSegment(buffer)
 		if pos != int(len(buffer)) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
+		require.Equal(t, buf, got.Decompress())
 	})
 
 	t.Run("group segment", func(t *testing.T) {
