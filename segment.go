@@ -90,6 +90,7 @@ func NewSegment(t SegmentType, buffer []byte, pos ...int) *Segment {
 		Type:      t,
 		Buffer:    buffer,
 		ByteCount: len(buffer),
+		BitMask:   0xff,
 		Repeat:    1,
 	}
 	mask, invert, compressed := CompressBuffer(buffer)
