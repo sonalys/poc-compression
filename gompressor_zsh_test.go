@@ -29,6 +29,19 @@ func Test_compressZSH(t *testing.T) {
 	t.Run("reconstruction", func(t *testing.T) {
 		block2, err := Decode(compressedOut)
 		require.NoError(t, err)
+
+		curExp := block.List.Head
+		curGot := block2.List.Head
+		for {
+			if curExp == nil {
+				require.Nil(t, curGot)
+				break
+			}
+			require.Equal(t, curExp.Value, curGot.Value)
+			curExp = curExp.Next
+			curGot = curGot.Next
+		}
+
 		out := Decompress(block2)
 		require.Equal(t, len(in), len(out))
 		for i := range in {

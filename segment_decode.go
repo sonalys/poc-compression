@@ -39,7 +39,7 @@ func decodeSameChar(b []byte) (*Segment, int) {
 	}
 	cur.Repeat, pos = decodeFunc[meta.RepeatSize](b, pos)
 	cur.MaxPos, pos, cur.Pos = decodePos(b, pos, meta.PosLenSize, meta.PosSize)
-	cur.Buffer, pos = b[pos:], pos+1
+	cur.Buffer, pos = b[pos:pos+1], pos+1
 	return &cur, pos
 }
 
