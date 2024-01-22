@@ -1,80 +1,103 @@
 package gompressor
 
+import (
+	"fmt"
+	"math"
+)
+
 type (
-	Metadata    uint8
-	SegmentType uint8
-	Mask        uint8
+	SegmentType byte
+	MaxSize     byte
+
+	Meta struct {
+		Type          SegmentType // 1 bit
+		InvertBitmask bool        // 1 bit
+		RepeatSize    MaxSize     // 1 bit
+		PosLenSize    MaxSize     // 1 bit
+		BufLenSize    MaxSize     // 2 bits
+		PosSize       MaxSize     // 2 bits
+	}
+
+	// TODO: implement meta specific per segment type.
+	// SameCharMetadata struct {
+	// 	Type       SegmentType // 1 bit
+	// 	RepeatSize MaxSize     // 1 bit
+	// 	SinglePos  bool        // 1 bit
+	// }
+
+	// RepeatingGroupMetadata struct {
+	// 	Type          SegmentType // 1 bit
+	// 	BitMaskInvert bool        // 1 bit
+	// }
+)
+
+const (
+	MaxSizeUint8 MaxSize = iota
+	MaxSizeUint16
+	MaxSizeUint32
+	MaxSizeUint64
 )
 
 const (
 	TypeRepeatingGroup SegmentType = iota
 	TypeRepeatSameChar
-
-	SegmentTypeMask Mask = 0b1
-	BitMaskInvert   Mask = 0b1 << 1
-	RepeatSizeMask  Mask = 0b1 << 2
-	LenPosSizeMask  Mask = 0b1 << 3
-	PosSizeMask     Mask = 0b11 << 4
-	LenBufSizeMask  Mask = 0b11 << 6
 )
 
-func NewMetadata() Metadata {
-	return Metadata(0)
+func NewMaxSize(value int) MaxSize {
+	switch {
+	case value > math.MaxUint32:
+		return MaxSizeUint64
+	case value > math.MaxUint16:
+		return MaxSizeUint32
+	case value > math.MaxUint8:
+		return MaxSizeUint16
+	default:
+		return MaxSizeUint8
+	}
 }
 
-func (m Metadata) Set(mask Mask, value byte) Metadata {
-	return m&^Metadata(mask) | Metadata(byte(mask)&value)
+func Byte2Bool(b byte) bool {
+	return b != 0
 }
 
-func (m Metadata) Check(mask Mask) byte {
-	return byte(m) & byte(mask)
+func Bool2Byte(b bool) byte {
+	if b {
+		return 1
+	}
+	return 0
 }
 
-func (m Metadata) ToByte() byte {
-	return byte(m)
+func NewMeta2(b byte) Meta {
+	return Meta{
+		Type:          SegmentType(b & 0b01),
+		InvertBitmask: Byte2Bool((b & (0b01 << 1) >> 1)),
+		RepeatSize:    MaxSize((b & (0b01 << 2) >> 2)),
+		PosLenSize:    MaxSize((b & (0b01 << 3) >> 3)),
+		PosSize:       MaxSize((b & (0b11 << 4) >> 4)),
+		BufLenSize:    MaxSize((b & (0b11 << 6) >> 6)),
+	}
 }
 
-func (m Metadata) SetType(value SegmentType) Metadata {
-	return m.Set(SegmentTypeMask, byte(value))
+func (m Meta) Validate() error {
+	if m.RepeatSize > 1 {
+		return fmt.Errorf("repeat size is bigger than 2 bytes")
+	}
+	if m.PosLenSize > 1 {
+		return fmt.Errorf("posLen is bigger than 2 bytes")
+	}
+	return nil
 }
 
-func (m Metadata) GetType() SegmentType {
-	return SegmentType(m.Check(SegmentTypeMask))
-}
-
-func (m Metadata) SetInvertBitMask(value byte) Metadata {
-	return m.Set(BitMaskInvert, byte(value)<<1)
-}
-
-func (m Metadata) GetInvertBitMask() byte {
-	return m.Check(BitMaskInvert) >> 1
-}
-
-func (m Metadata) SetRepSize(value byte) Metadata {
-	return m.Set(RepeatSizeMask, byte(value)<<2)
-}
-
-func (m Metadata) SetPosLenSize(value byte) Metadata {
-	return m.Set(LenPosSizeMask, byte(value)<<3)
-}
-
-func (m Metadata) SetPosSize(value byte) Metadata {
-	return m.Set(PosSizeMask, byte(value)<<4)
-}
-
-func (m Metadata) SetBufLenSize(value byte) Metadata {
-	return m.Set(LenBufSizeMask, byte(value)<<6)
-}
-
-func (m Metadata) GetRepSize() byte {
-	return m.Check(RepeatSizeMask) >> 2
-}
-func (m Metadata) GetPosLenSize() byte {
-	return m.Check(LenPosSizeMask) >> 3
-}
-func (m Metadata) GetPosSize() byte {
-	return m.Check(PosSizeMask) >> 4
-}
-func (m Metadata) GetBufLenSize() byte {
-	return m.Check(LenBufSizeMask) >> 6
+func (m Meta) ToByte() byte {
+	if err := m.Validate(); err != nil {
+		panic(err.Error())
+	}
+	var resp byte
+	resp |= byte(m.Type)
+	resp |= Bool2Byte(m.InvertBitmask) << 1
+	resp |= byte(m.RepeatSize) << 2
+	resp |= byte(m.PosLenSize) << 3
+	resp |= byte(m.PosSize) << 4
+	resp |= byte(m.BufLenSize) << 6
+	return resp
 }

@@ -32,7 +32,7 @@ func Compress(buf []byte) *Block {
 	size := len(buf)
 	layers := []func([]byte) (*LinkedList[*Segment], []byte){
 		CreateSameCharSegments,
-		CreateRepeatingSegments,
+		// CreateRepeatingSegments,
 	}
 	list := NewLinkedList[*Segment]()
 	for _, compressionLayer := range layers {

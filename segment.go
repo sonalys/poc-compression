@@ -42,7 +42,7 @@ func (s *Segment) GetOriginalSize() int {
 	return GetOriginalSize(s.Type, s.Repeat, len(s.Pos), s.ByteCount)
 }
 
-func getintSegmentBitSize(n int) int {
+func getStorageByteSize(n int) int {
 	switch {
 	case n > math.MaxUint32:
 		return 8
@@ -57,8 +57,8 @@ func getintSegmentBitSize(n int) int {
 
 func GetCompressedSize(t SegmentType, repeat, maxPos, posLen, size int) int {
 	var compressedSize int = 1
-	compressedSize += getintSegmentBitSize(size)
-	compressedSize += getintSegmentBitSize(posLen)
+	compressedSize += getStorageByteSize(size)
+	compressedSize += getStorageByteSize(posLen)
 	if t == TypeRepeatSameChar {
 		if repeat > math.MaxUint8 {
 			compressedSize += 2
@@ -68,7 +68,7 @@ func GetCompressedSize(t SegmentType, repeat, maxPos, posLen, size int) int {
 	} else {
 		compressedSize += 1
 	}
-	compressedSize += posLen * getintSegmentBitSize(maxPos)
+	compressedSize += posLen * getStorageByteSize(maxPos)
 	compressedSize += size
 	return compressedSize
 }

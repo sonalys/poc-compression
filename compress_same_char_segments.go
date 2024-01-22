@@ -58,13 +58,13 @@ func CreateSameCharSegments(buf []byte) (*LinkedList[*Segment], []byte) {
 	for char, posList := range byteMap {
 		posBySize := make(map[int][]int, len(posList))
 		for i := 0; i < len(posList); i++ {
-			var size int
-			for j := i + 1; j < len(posList); j++ {
+			var j int
+			for j = i + 1; j < len(posList); j++ {
 				if posList[j] != posList[j-1]+1 {
-					size = j - i
 					break
 				}
 			}
+			size := j - i
 			if size < 2 {
 				continue
 			}
