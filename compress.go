@@ -1,19 +1,19 @@
 package gompressor
 
 import (
-	"github.com/sonalys/gompressor/linkedlist"
+	ll "github.com/sonalys/gompressor/linkedlist"
 	"github.com/sonalys/gompressor/segments"
 )
 
 func Compress(buf []byte) *Block {
 	size := len(buf)
-	layers := []func([]byte) (*linkedlist.LinkedList[segments.Segment], []byte){
+	layers := []func([]byte) (*ll.LinkedList[segments.Segment], []byte){
 		segments.CreateSameCharSegments,
 		segments.CreateGroupSegments,
 	}
-	list := linkedlist.NewLinkedList[segments.Segment]()
+	list := ll.NewLinkedList[segments.Segment]()
 	for _, compressionLayer := range layers {
-		var newSegments *linkedlist.LinkedList[segments.Segment]
+		var newSegments *ll.LinkedList[segments.Segment]
 		// note that we are changing buf through each layer.
 		// that means different coordinates for each layer.
 		newSegments, buf = compressionLayer(buf)

@@ -3,7 +3,7 @@ package segments
 import (
 	"sort"
 
-	"github.com/sonalys/gompressor/linkedlist"
+	ll "github.com/sonalys/gompressor/linkedlist"
 )
 
 type sizePos struct {
@@ -54,9 +54,9 @@ func shouldMerge(sp *sizePos, cur, other int) bool {
 	return curGain+otherGain < mergeGain
 }
 
-func CreateSameCharSegments(buf []byte) (*linkedlist.LinkedList[Segment], []byte) {
+func CreateSameCharSegments(buf []byte) (*ll.LinkedList[Segment], []byte) {
 	byteMap := MapBytePos(buf)
-	list := &linkedlist.LinkedList[Segment]{}
+	list := &ll.LinkedList[Segment]{}
 	for char, posList := range byteMap {
 		posBySize := make(map[int][]int, len(posList))
 		for i := 0; i < len(posList); i++ {

@@ -3,7 +3,7 @@ package gompressor
 import (
 	"testing"
 
-	"github.com/sonalys/gompressor/linkedlist"
+	ll "github.com/sonalys/gompressor/linkedlist"
 	"github.com/sonalys/gompressor/segments"
 	"github.com/stretchr/testify/require"
 )
@@ -11,7 +11,7 @@ import (
 func Test_BlockEncoding(t *testing.T) {
 	b := &Block{
 		OriginalSize: 100,
-		List:         &linkedlist.LinkedList[segments.Segment]{},
+		List:         &ll.LinkedList[segments.Segment]{},
 		Buffer:       []byte{1, 2, 3},
 	}
 	encoded := Encode(b)

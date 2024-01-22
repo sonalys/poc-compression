@@ -4,7 +4,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/sonalys/gompressor/linkedlist"
+	ll "github.com/sonalys/gompressor/linkedlist"
 )
 
 func getGain(matched []int, size int) int {
@@ -125,12 +125,12 @@ func appendUncollidedPos(posList []int, collision []bool, seg *SegmentGroup, sta
 }
 
 // CreateGroupSegments should linearly detect repeating groups, without overlapping.
-func CreateGroupSegments(buf []byte) (*linkedlist.LinkedList[Segment], []byte) {
+func CreateGroupSegments(buf []byte) (*ll.LinkedList[Segment], []byte) {
 	bufLen := len(buf)
 	byteMap := MapBytePos(buf)
 	bytePop := GetBytePopularity(byteMap)
 	collision := make([]bool, bufLen)
-	list := linkedlist.NewLinkedList[Segment]()
+	list := ll.NewLinkedList[Segment]()
 	// We start by searching groups by the less frequent bytes.
 	for _, char := range bytePop {
 		posList := byteMap[char]

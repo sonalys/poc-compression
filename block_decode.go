@@ -3,7 +3,7 @@ package gompressor
 import (
 	"encoding/binary"
 
-	"github.com/sonalys/gompressor/linkedlist"
+	ll "github.com/sonalys/gompressor/linkedlist"
 	"github.com/sonalys/gompressor/segments"
 )
 
@@ -14,7 +14,7 @@ func Decode(in []byte) (out *Block, err error) {
 	var pos int
 	out = &Block{
 		OriginalSize: int(decoder.Uint64(in)),
-		List:         &linkedlist.LinkedList[segments.Segment]{},
+		List:         &ll.LinkedList[segments.Segment]{},
 	}
 	bufLen := int(decoder.Uint64(in[8:]))
 	pos += 16
