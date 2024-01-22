@@ -31,7 +31,7 @@ var pool = sync.Pool{
 	},
 }
 
-func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevOffset int) ([]int, int) {
+func GrowOffset(in []byte, collision []bool, posList []int, offset, prevOffset int) ([]int, int) {
 	// Copy, so we are able to return original posList in case nothing matches.
 	localPosList := posList
 	var bestMatched []int
@@ -62,13 +62,13 @@ func GrowOffset(buf []byte, collision []bool, posList []int, offset, prevOffset 
 			lastMatchedPos := curPos
 			for j := i + 1; j < len(localPosList); j++ {
 				nextPos := localPosList[j]
-				if collision[nextPos] || nextPos+offset >= len(buf) {
+				if collision[nextPos] || nextPos+offset >= len(in) {
 					continue
 				}
 				if nextPos-lastMatchedPos <= size-1 {
 					continue
 				}
-				if buf[curPos+offset] == buf[nextPos+offset] {
+				if in[curPos+offset] == in[nextPos+offset] {
 					lastMatchedPos = nextPos
 					startMatched = append(startMatched, nextPos)
 				}
@@ -125,9 +125,9 @@ func appendUncollidedPos(posList []int, collision []bool, seg *SegmentGroup, sta
 }
 
 // CreateGroupSegments should linearly detect repeating groups, without overlapping.
-func CreateGroupSegments(buf []byte) (*ll.LinkedList[Segment], []byte) {
-	bufLen := len(buf)
-	byteMap := MapBytePos(buf)
+func CreateGroupSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
+	bufLen := len(in)
+	byteMap := MapBytePos(in)
 	bytePop := GetBytePopularity(byteMap)
 	collision := make([]bool, bufLen)
 	list := ll.NewLinkedList[Segment]()
@@ -138,15 +138,15 @@ func CreateGroupSegments(buf []byte) (*ll.LinkedList[Segment], []byte) {
 			continue
 		}
 		var startOffset, endOffset int
-		posList, startOffset = GrowOffset(buf, collision, posList, -1, 0)
-		posList, endOffset = GrowOffset(buf, collision, posList, 1, startOffset)
+		posList, startOffset = GrowOffset(in, collision, posList, -1, 0)
+		posList, endOffset = GrowOffset(in, collision, posList, 1, startOffset)
 		size := endOffset - startOffset + 1
 		if size < 2 || len(posList) < 2 {
 			continue
 		}
 		startPos := posList[0] + startOffset
 		endPos := posList[0] + endOffset + 1
-		segment := NewGroupSegment(buf[startPos:endPos])
+		segment := NewGroupSegment(in[startPos:endPos])
 		appendUncollidedPos(posList, collision, segment, startOffset, size)
 		if segment.GetCompressionGains() <= 0 {
 			continue
@@ -154,5 +154,5 @@ func CreateGroupSegments(buf []byte) (*ll.LinkedList[Segment], []byte) {
 		registerBytes(collision, segment.pos, size)
 		list.AppendValue(segment)
 	}
-	return list, FillSegmentGaps(buf, list)
+	return list, FillSegmentGaps(in, list)
 }

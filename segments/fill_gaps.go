@@ -52,9 +52,9 @@ func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters 
 	return out
 }
 
-func FillSegmentGaps(buf []byte, list *ll.LinkedList[Segment]) []byte {
+func FillSegmentGaps(in []byte, list *ll.LinkedList[Segment]) []byte {
 	var prev int
-	out := make([]byte, 0, len(buf))
+	out := make([]byte, 0, len(in))
 	orderedSegments := SortAndFilterSegments(list, true, func(le *ll.ListEntry[Segment]) bool {
 		if le.Value.GetCompressionGains() <= 0 {
 			le.Remove()
@@ -68,9 +68,9 @@ func FillSegmentGaps(buf []byte, list *ll.LinkedList[Segment]) []byte {
 			msg := fmt.Sprintf(mask, orderedSegments[i-1].Pos, cur.Pos)
 			panic(msg)
 		}
-		out = append(out, buf[prev:cur.Pos]...)
+		out = append(out, in[prev:cur.Pos]...)
 		prev = cur.Pos + cur.Segment.GetOriginalSize()/len(cur.Segment.GetPos())
 	}
-	out = append(out, buf[prev:]...)
+	out = append(out, in[prev:]...)
 	return out
 }

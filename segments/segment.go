@@ -16,6 +16,8 @@ func DecodeSegment(b []byte) (Segment, int) {
 		return DecodeSameChar(b)
 	case TypeGroup:
 		return DecodeGroup(b)
+	case TypeMasked:
+		return DecodeMasked(b)
 	default:
 		panic("unknown segment type")
 	}

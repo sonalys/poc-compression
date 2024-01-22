@@ -106,8 +106,7 @@ func DecompressBuffer(mask byte, invert bool, compressed []byte, compressedLen i
 		return bytes.Repeat(buf, compressedLen)
 	}
 	compressedBits := GetMaskBits(mask)
-	bufLen := compressedLen
-	buf := make([]byte, 0, bufLen)
+	buf := make([]byte, 0, compressedLen)
 	filterMask := createFilterMask(maskSize)
 	for pos := 0; pos < compressedLen*maskSize; pos += maskSize {
 		bytePos := pos / 8

@@ -5,18 +5,19 @@ import (
 	"github.com/sonalys/gompressor/segments"
 )
 
-func Compress(buf []byte) *Block {
-	size := len(buf)
+func Compress(in []byte) *Block {
+	size := len(in)
 	layers := []func([]byte) (*ll.LinkedList[segments.Segment], []byte){
 		segments.CreateSameCharSegments,
 		segments.CreateGroupSegments,
+		segments.CreateMaskedSegments,
 	}
 	list := ll.NewLinkedList[segments.Segment]()
 	for _, compressionLayer := range layers {
 		var newSegments *ll.LinkedList[segments.Segment]
 		// note that we are changing buf through each layer.
 		// that means different coordinates for each layer.
-		newSegments, buf = compressionLayer(buf)
+		newSegments, in = compressionLayer(in)
 		list.Append(newSegments.Head)
 	}
 	// Don't run any optimizations outside, because the coordinates of each layer are relative.
@@ -24,6 +25,6 @@ func Compress(buf []byte) *Block {
 	return &Block{
 		OriginalSize: size,
 		List:         list,
-		Buffer:       buf,
+		Buffer:       in,
 	}
 }

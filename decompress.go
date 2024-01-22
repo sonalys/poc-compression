@@ -7,12 +7,12 @@ func Decompress(b *Block) []byte {
 	copy(out, b.Buffer)
 	orderedSegments := segments.SortAndFilterSegments(b.List, true)
 	for _, cur := range orderedSegments {
-		buf := cur.Decompress()
-		bufLen := len(buf)
+		buffer := cur.Decompress()
+		bufLen := len(buffer)
 		// right-shift data.
 		copy(out[cur.Pos+bufLen:], out[cur.Pos:])
 		// copy out decompressed buf into out[pos].
-		copy(out[cur.Pos:], buf)
+		copy(out[cur.Pos:], buffer)
 	}
 	return out
 }

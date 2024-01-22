@@ -22,10 +22,23 @@ func main() {
 	if err != nil {
 		panic("failed to read file")
 	}
-	// in = in[:math.MaxUint16]
+	in = in[:10000]
 	block := gompressor.Compress(in)
 	compressedOut := gompressor.Encode(block)
 	compressedSize := int(len(compressedOut))
+
+	out := gompressor.Decompress(block)
+	if len(in) != len(out) {
+		msg := fmt.Sprintf("output size is different. exp %d != got %d", len(in), len(out))
+		panic(msg)
+	}
+
+	for i := range in {
+		if in[i] != out[i] {
+			msg := fmt.Sprintf("output is different at pos %d exp %d != got %d", i, in[i], out[i])
+			panic(msg)
+		}
+	}
 
 	var segmentCount int
 	var minGain, maxGain int = math.MaxInt, 0
