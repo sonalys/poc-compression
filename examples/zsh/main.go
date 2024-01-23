@@ -22,7 +22,7 @@ func main() {
 	if err != nil {
 		panic("failed to read file")
 	}
-	in = in[:10000]
+	in = in[:2226]
 	block := gompressor.Compress(in)
 	compressedOut := gompressor.Encode(block)
 	compressedSize := int(len(compressedOut))
@@ -43,7 +43,7 @@ func main() {
 
 	var segmentCount int
 	var minGain, maxGain int = math.MaxInt, 0
-	cur := block.List.Head
+	cur := block.Segments.Head
 	for {
 		if cur == nil {
 			break

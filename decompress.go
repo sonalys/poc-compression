@@ -5,7 +5,7 @@ import "github.com/sonalys/gompressor/segments"
 func Decompress(b *Block) []byte {
 	out := make([]byte, b.OriginalSize)
 	copy(out, b.Buffer)
-	orderedSegments := segments.SortAndFilterSegments(b.List, true)
+	orderedSegments := segments.SortAndFilterSegments(b.Segments, true)
 	for _, cur := range orderedSegments {
 		buffer := cur.Decompress()
 		bufLen := len(buffer)

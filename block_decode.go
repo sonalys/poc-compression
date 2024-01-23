@@ -14,7 +14,7 @@ func Decode(in []byte) (out *Block, err error) {
 	var pos int
 	out = &Block{
 		OriginalSize: int(decoder.Uint64(in)),
-		List:         &ll.LinkedList[segments.Segment]{},
+		Segments:     &ll.LinkedList[segments.Segment]{},
 	}
 	bufLen := int(decoder.Uint64(in[8:]))
 	pos += 16
@@ -28,7 +28,7 @@ func Decode(in []byte) (out *Block, err error) {
 		}
 		decoded, offset := segments.DecodeSegment(in[pos:])
 		pos += offset
-		out.List.AppendValue(decoded)
+		out.Segments.AppendValue(decoded)
 	}
 	return
 }

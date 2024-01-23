@@ -9,10 +9,10 @@ func Encode(b *Block) []byte {
 	out = encoder.AppendUint64(out, uint64(b.OriginalSize))
 	out = encoder.AppendUint64(out, uint64(len(b.Buffer)))
 	out = append(out, b.Buffer...)
-	if b.List == nil {
+	if b.Segments == nil {
 		return out
 	}
-	cur := b.List.Head
+	cur := b.Segments.Head
 	for {
 		if cur == nil {
 			break
