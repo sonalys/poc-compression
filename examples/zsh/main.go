@@ -22,7 +22,7 @@ func main() {
 	if err != nil {
 		panic("failed to read file")
 	}
-	in = in[:2226]
+	// in = in[:2226]
 	block := gompressor.Compress(in)
 	compressedOut := gompressor.Encode(block)
 	compressedSize := int(len(compressedOut))
