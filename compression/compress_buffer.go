@@ -61,12 +61,12 @@ func CompressBuffer(in []byte) (byte, bool, []byte) {
 			invertMask |= buf[i]
 		}
 		if newSize := Count1Bits(invertMask); newSize < maskSize {
+			invert = true
 			if newSize == 0 {
-				return invertMask, true, []byte{}
+				return invertMask, invert, []byte{}
 			}
 			mask = invertMask
 			maskSize = newSize
-			invert = true
 			in = buf
 		}
 	}

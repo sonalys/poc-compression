@@ -16,7 +16,7 @@ func NewRepeatGroupMeta(b byte) MetaRepeatGroup {
 		InvertMask: Byte2Bool((b & (0b01 << 2) >> 2)),
 		PosLenSize: MaxSize((b & (0b01 << 3) >> 3)),
 		PosSize:    MaxSize((b & (0b11 << 4) >> 4)),
-		BufLenSize: MaxSize((b & (0b11 << 5) >> 6)),
+		BufLenSize: MaxSize((b & (0b11 << 5) >> 5)),
 	}
 }
 
