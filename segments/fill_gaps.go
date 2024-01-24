@@ -7,14 +7,14 @@ import (
 	ll "github.com/sonalys/gompressor/linkedlist"
 )
 
-type SegmentPosMap struct {
+type SegmentPosMap[T Segment] struct {
 	Pos int
 	Segment
-	Entry *ll.ListEntry[Segment]
+	Entry *ll.ListEntry[T]
 }
 
-func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters ...func(*ll.ListEntry[Segment]) bool) []SegmentPosMap {
-	out := make([]SegmentPosMap, 0, list.Len)
+func SortAndFilterSegments[T Segment](list *ll.LinkedList[T], sortType bool, filters ...func(*ll.ListEntry[T]) bool) []SegmentPosMap[T] {
+	out := make([]SegmentPosMap[T], 0, list.Len)
 	cur := list.Head
 	for {
 		if cur == nil {
@@ -30,7 +30,7 @@ func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters 
 			}
 		}
 		for _, pos := range curValue.GetPos() {
-			out = append(out, SegmentPosMap{
+			out = append(out, SegmentPosMap[T]{
 				Pos:     pos,
 				Entry:   cur,
 				Segment: curValue,
@@ -52,7 +52,7 @@ func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters 
 	return out
 }
 
-func removeBadSegments(entry *ll.ListEntry[Segment]) bool {
+func removeBadSegments[T Segment](entry *ll.ListEntry[T]) bool {
 	if entry.Value.GetCompressionGains() <= 0 {
 		entry.Remove()
 		return false
@@ -60,7 +60,7 @@ func removeBadSegments(entry *ll.ListEntry[Segment]) bool {
 	return true
 }
 
-func FillSegmentGaps(in []byte, list *ll.LinkedList[Segment]) []byte {
+func FillSegmentGaps[T Segment](in []byte, list *ll.LinkedList[T]) []byte {
 	var prev int
 	out := make([]byte, 0, len(in))
 	orderedSegments := SortAndFilterSegments(list, true, removeBadSegments)

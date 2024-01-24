@@ -1,28 +1,22 @@
 package gompressor
 
 import (
-	ll "github.com/sonalys/gompressor/linkedlist"
 	"github.com/sonalys/gompressor/segments"
 )
 
-var layers = []func([]byte) (*ll.LinkedList[segments.Segment], []byte){
+var layers = []func([]byte) []byte{
 	segments.CreateSameCharSegments,
-	segments.CreateGroupSegments,
-	segments.CreateMaskedSegments,
+	// segments.CreateGroupSegments,
+	// segments.CreateMaskedSegments,
 }
 
 func Compress(in []byte) *Block {
-	list := ll.NewLinkedList[segments.Segment]()
-	buffer := in
 	for _, compressionLayer := range layers {
-		newSegments, out := compressionLayer(buffer)
-		list = newSegments.Append(list.Head)
-		buffer = out
+		in = compressionLayer(in)
 	}
 	return &Block{
 		OriginalSize: len(in),
-		Segments:     list,
-		Buffer:       buffer,
+		Buffer:       in,
 	}
 }
 

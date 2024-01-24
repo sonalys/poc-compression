@@ -54,9 +54,9 @@ func shouldMerge(sp *sizePos, cur, other int) bool {
 	return curGain+otherGain < mergeGain
 }
 
-func CreateSameCharSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
+func CreateSameCharSegments(in []byte) []byte {
 	byteMap := MapBytePos(in)
-	list := &ll.LinkedList[Segment]{}
+	list := &ll.LinkedList[*SegmentSameChar]{}
 	const minSize = 2
 	for char, posList := range byteMap {
 		posBySize := make(map[int][]int, len(posList))
@@ -101,5 +101,7 @@ func CreateSameCharSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
 			list.AppendValue(seg)
 		}
 	}
-	return list, FillSegmentGaps(in, list)
+	raw := FillSegmentGaps(in, list)
+
+	return raw
 }
