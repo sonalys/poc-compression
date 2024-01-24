@@ -97,7 +97,7 @@ func (s *SegmentSameChar) Encode() []byte {
 	}
 
 	if meta.RepeatSize >= 2 {
-		panic("fuck")
+		panic("sameCharSegment repeat overflow 2 bytes")
 	}
 
 	buffer = append(buffer, meta.ToByte())

@@ -18,16 +18,27 @@ var paths = []string{
 	"/home/raicon/Pictures/Screenshot_20240105_145006.png",
 }
 
-func printStatistics(in []byte, compressedSize int, list *ll.LinkedList[segments.Segment], t1 time.Time) {
+func printStatistics(in []byte, compressedSize, uncompressedSize int, list *ll.LinkedList[segments.Segment], t1 time.Time) {
 	var segmentCount int
 	var minGain, maxGain int = math.MaxInt, 0
 	cur := list.Head
+
+	typeCount := map[segments.SegmentType]int{}
+	typeGain := map[segments.SegmentType]int{}
+
 	for {
 		if cur == nil {
 			break
 		}
 		segmentCount++
-		if gain := cur.Value.GetCompressionGains(); gain > maxGain {
+
+		gain := cur.Value.GetCompressionGains()
+		t := cur.Value.GetType()
+
+		typeCount[t] += len(cur.Value.GetPos())
+		typeGain[t] += gain
+
+		if gain > maxGain {
 			maxGain = gain
 		} else if gain < minGain {
 			minGain = gain
@@ -38,6 +49,8 @@ func printStatistics(in []byte, compressedSize int, list *ll.LinkedList[segments
 	ratio := float64(compressedSize) / float64(len(in))
 	fmt.Printf(`ratio:				%.2f (%d / %d)
 compressed:			%d bytes
+uncompressed:			%d bytes
+segments storage:		%d bytes
 segments:			%d
 minGain:			%d bytes
 maxGain:			%d bytes
@@ -47,11 +60,23 @@ took:				%s
 		compressedSize,
 		int(len(in)),
 		int(len(in))-compressedSize,
+		uncompressedSize,
+		len(in)-uncompressedSize,
 		segmentCount,
 		minGain,
 		maxGain,
 		time.Since(t1),
 	)
+
+	fmt.Println("\nType Pos count:")
+	for t, count := range typeCount {
+		fmt.Printf("%s:\t%d\n", segments.TypeName[t], count)
+	}
+
+	fmt.Println("\nType Gain:")
+	for t, gain := range typeGain {
+		fmt.Printf("%s:\t%d\tbytes\n", segments.TypeName[t], gain)
+	}
 }
 
 func verifyIntegrity(in, out []byte) {
@@ -76,6 +101,7 @@ func main() {
 	}
 	// in = in[:10000]
 	var compressedSize int
+	var uncompressedSize int
 	allChunksList := ll.NewLinkedList[segments.Segment]()
 	const chunkSize = math.MaxUint16
 	for i := 0; i < len(in); i += chunkSize {
@@ -87,9 +113,10 @@ func main() {
 		block := gompressor.Compress(chunk)
 		compressedOut := gompressor.Encode(block)
 		compressedSize += len(compressedOut)
+		uncompressedSize += len(block.Buffer)
 		out := gompressor.Decompress(block)
 		verifyIntegrity(chunk, out)
 		allChunksList.Append(block.Segments.Head)
 	}
-	printStatistics(in, compressedSize, allChunksList, t1)
+	printStatistics(in, compressedSize, uncompressedSize, allChunksList, t1)
 }

@@ -15,6 +15,12 @@ const (
 	TypeSameChar
 )
 
+var TypeName = []string{
+	"masked",
+	"group",
+	"char",
+}
+
 const (
 	MaxSizeUint8 MaxSize = iota
 	MaxSizeUint16
