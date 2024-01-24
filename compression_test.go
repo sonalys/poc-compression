@@ -11,7 +11,7 @@ import (
 func Test_Compression(t *testing.T) {
 	t.Run("test 3 segments", func(t *testing.T) {
 		list := ll.NewLinkedList[segments.Segment]()
-		list.AppendValue(segments.NewMaskedSegment(segments.WithBuffer([]byte{4, 5, 6}), 2))
+		list.AppendValue(segments.NewMaskedSegment([]byte{4, 5, 6}, 2))
 		list.AppendValue(segments.NewGroupSegment([]byte{1, 2, 3}, 1))
 		list.AppendValue(segments.NewRepeatSegment(3, 1, 5))
 		block := &Block{

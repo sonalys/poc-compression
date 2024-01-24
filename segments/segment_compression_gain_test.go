@@ -8,7 +8,7 @@ import (
 
 func Test_GetCompressionGain(t *testing.T) {
 	t.Run("masked segment", func(t *testing.T) {
-		seg := NewMaskedSegment(WithBuffer([]byte{255, 254, 244}), 1)
+		seg := NewMaskedSegment([]byte{255, 254, 244}, 1)
 		originalSize := int(3)
 		compressedSize := int(len(seg.Encode()))
 		require.Equal(t, compressedSize, seg.getCompressedSize())

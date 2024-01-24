@@ -2,12 +2,37 @@ package compression
 
 import "bytes"
 
-func createMask(in []byte) byte {
-	var mask byte
-	for _, char := range in {
-		mask |= char
+func MaskRegisterBuffer(buffer []byte) (mask byte, maskSize int, enableInvert bool, invertList []bool) {
+	invertList = make([]bool, len(buffer))
+	for i, b := range buffer {
+		var shouldEnableInvert bool
+		var byteInvert bool
+		mask, shouldEnableInvert, byteInvert, maskSize = MaskRegisterByte(mask, b)
+		if maskSize == 8 {
+			return
+		}
+		enableInvert = enableInvert || shouldEnableInvert
+		if byteInvert {
+			invertList[i] = true
+		}
 	}
-	return mask
+	return
+}
+
+func MaskRegisterByte(m byte, value byte) (mask byte, enableInvert, byteInvert bool, maskSize int) {
+	normal := m | value
+	inverted := m | ^value
+	// If we are using 7 bits or more on both masks, we won't save any space.
+	// So we just return the original input with a full mask.
+	if normal > 253 && inverted > 253 {
+		return 0xff, false, false, 8
+	}
+	invertedSize := Count1Bits(inverted)
+	normalSize := Count1Bits(normal)
+	if invertedSize < normalSize {
+		return inverted, true, true, invertedSize
+	}
+	return normal, false, false, normalSize
 }
 
 // Count1Bits counts how many 1 bits there are in a byte.
@@ -30,62 +55,74 @@ func GetMaskBits(mask byte) []int {
 	return compressedBits
 }
 
-func CompressByte(compressBits []int, value byte) byte {
-	var resp byte
+func Byte2Bool(b byte) bool {
+	return b != 0
+}
+
+func Bool2Byte(b bool) byte {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func CompressByte(compressBits []int, enableInvert, shouldInvertByte bool, value byte) (resp byte) {
+	if shouldInvertByte {
+		value = ^value
+	}
 	for i, n := range compressBits {
-		resp |= ((value & (1 << n)) >> (n - i))
+		resp |= value & (1 << n) >> (n - i)
+	}
+	if enableInvert {
+		return resp<<1 | Bool2Byte(shouldInvertByte)
 	}
 	return resp
 }
 
-func DecompressByte(compressBits []int, value byte) byte {
-	var resp byte
+func DecompressByte(compressBits []int, enableInvert bool, value byte) (resp byte) {
+	var didByteInvert byte
+	if enableInvert {
+		didByteInvert = value & 0b1
+		value = value >> 1
+	}
 	for i, n := range compressBits {
-		resp |= (value & (1 << i) << (n - i))
+		resp |= value & (1 << i) << (n - i)
+	}
+	if didByteInvert != 0 {
+		return ^resp
 	}
 	return resp
 }
 
-func CompressBuffer(in []byte) (byte, bool, []byte) {
-	mask := createMask(in)
-	maskSize := Count1Bits(mask)
-	invert := false
-	if maskSize == 0 {
-		return mask, invert, []byte{}
+func CompressBuffer(in []byte) (mask byte, enableInvert bool, compressed []byte) {
+	mask, maskSize, enableInvert, invertList := MaskRegisterBuffer(in)
+	if maskSize == 8 {
+		return 0xff, enableInvert, in
 	}
-	if maskSize > 4 {
-		buf := bytes.Clone(in)
-		var invertMask byte
-		for i := range buf {
-			buf[i] = ^buf[i]
-			invertMask |= buf[i]
-		}
-		if newSize := Count1Bits(invertMask); newSize < maskSize {
-			invert = true
-			if newSize == 0 {
-				return invertMask, invert, []byte{}
-			}
-			mask = invertMask
-			maskSize = newSize
-			in = buf
-		}
+	if !enableInvert && maskSize == 0 {
+		return 0x00, false, []byte{}
+	}
+	// maskSize + 1 because we use bit 0 for invert flag.
+	if enableInvert {
+		maskSize++
 	}
 	compBitsSize := len(in) * maskSize
 	compLen := (compBitsSize + 8 - 1) / 8
-	compressed := make([]byte, compLen)
+	compressed = make([]byte, compLen)
 	compressedBits := GetMaskBits(mask)
 	for i, char := range in {
 		pos := i * maskSize
 		bytePos := ((pos / 8) + 1) * 8
 		offset := pos + maskSize - bytePos
 		if offset <= 0 {
-			compressed[pos/8] |= CompressByte(compressedBits, char) << -offset
+			compressed[pos/8] |= CompressByte(compressedBits, enableInvert, invertList[i], char) << -offset
 			continue
 		}
-		compressed[pos/8] |= CompressByte(compressedBits, char) >> offset
-		compressed[pos/8+1] |= CompressByte(compressedBits, char) << (8 - offset)
+		value := CompressByte(compressedBits, enableInvert, invertList[i], char)
+		compressed[pos/8] |= value >> offset
+		compressed[pos/8+1] |= value << (8 - offset)
 	}
-	return mask, invert, compressed
+	return mask, enableInvert, compressed
 }
 
 func createFilterMask(maskSize int) byte {
@@ -96,14 +133,17 @@ func createFilterMask(maskSize int) byte {
 	return filterMask
 }
 
-func DecompressBuffer(mask byte, invert bool, compressed []byte, compressedLen int) []byte {
+func DecompressBuffer(mask byte, enableInvert bool, compressed []byte, compressedLen int) []byte {
+	if mask == 0xff {
+		return compressed
+	}
 	maskSize := Count1Bits(mask)
-	if maskSize == 0 {
+	if !enableInvert && maskSize == 0 {
 		buf := []byte{0}
-		if invert {
-			buf = []byte{0xff}
-		}
 		return bytes.Repeat(buf, compressedLen)
+	}
+	if enableInvert {
+		maskSize++
 	}
 	compressedBits := GetMaskBits(mask)
 	buf := make([]byte, 0, compressedLen)
@@ -112,16 +152,12 @@ func DecompressBuffer(mask byte, invert bool, compressed []byte, compressedLen i
 		bytePos := pos / 8
 		offset := pos + maskSize - ((bytePos + 1) * 8)
 		if offset <= 0 {
-			buf = append(buf, DecompressByte(compressedBits, compressed[bytePos]&(filterMask<<-offset)>>-offset))
+			value := compressed[bytePos] & (filterMask << -offset) >> -offset
+			buf = append(buf, DecompressByte(compressedBits, enableInvert, value))
 			continue
 		}
-		buf = append(buf, DecompressByte(compressedBits, compressed[bytePos]&(filterMask>>offset)<<offset+compressed[bytePos+1]>>(8-offset)))
-	}
-	if !invert {
-		return buf
-	}
-	for i := range buf {
-		buf[i] = ^buf[i]
+		value := compressed[bytePos]&(filterMask>>offset)<<offset + compressed[bytePos+1]>>(8-offset)
+		buf = append(buf, DecompressByte(compressedBits, enableInvert, value))
 	}
 	return buf
 }

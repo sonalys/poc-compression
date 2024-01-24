@@ -7,40 +7,31 @@ import (
 	ll "github.com/sonalys/gompressor/linkedlist"
 )
 
-func recalculateWindowMaskGain(in []byte, mask, notMask byte, pos, size int) (byte, byte, int, bool) {
-	mask |= in[pos]
-	notMask |= ^in[pos]
-	if mask == 0xff && notMask == 0xff {
-		return mask, notMask, math.MinInt, false
-	}
-	sizeMask, sizeNotMask := compression.Count1Bits(mask), compression.Count1Bits(notMask)
-	if sizeNotMask < sizeMask {
-		sizeMask = sizeNotMask
+func recalculateWindowMaskGain(in []byte, mask byte, pos, size int) (byte, int, bool) {
+	mask, _, _, sizeMask := compression.MaskRegisterByte(mask, in[pos])
+	if sizeMask == 8 {
+		return mask, math.MinInt, false
 	}
 	compressedSize := (size*sizeMask + 8 - 1) / 8
 	gain := size - compressedSize
-	return mask, notMask, gain, true
+	return mask, gain, true
 }
 
 func getBestEnd(in []byte, start, bestEnd, bestGain int) (int, int) {
 	inLen := len(in)
 	var mask byte
-	var notMask byte
 	var gain int
+	var maskSize int
 	var ok bool
 	for i := start; i <= bestEnd; i++ {
-		mask |= in[i]
-		notMask |= ^in[i]
-		if mask == 0xff && notMask == 0xff {
-			return bestEnd, bestGain
+		mask, _, _, maskSize = compression.MaskRegisterByte(mask, in[i])
+		if maskSize == 8 {
+			return bestEnd, gain
 		}
 	}
 	for newEnd := bestEnd + 1; bestEnd < inLen-1; newEnd++ {
-		mask, notMask, gain, ok = recalculateWindowMaskGain(in, mask, notMask, newEnd, newEnd-start)
-		if !ok {
-			return bestEnd, bestGain
-		}
-		if gain <= bestGain {
+		mask, gain, ok = recalculateWindowMaskGain(in, mask, newEnd, newEnd-start)
+		if !ok || gain < bestGain {
 			break
 		}
 		bestEnd = newEnd
@@ -52,22 +43,21 @@ func getBestEnd(in []byte, start, bestEnd, bestGain int) (int, int) {
 func getBestStart(in []byte, bestStart, end, bestGain int, minSize int) (int, int) {
 	for newStart := bestStart + 1; bestStart+minSize < end; newStart++ {
 		var mask byte
-		var notMask byte
+		var maskSize int
 		var gain int
 		var ok bool
 		// We are removing the first byte, so we always have to recalculate the masks.
 		for i := newStart; i <= end; i++ {
-			mask |= in[i]
-			notMask |= ^in[i]
-			if mask == 0xff && notMask == 0xff {
+			mask, _, _, maskSize = compression.MaskRegisterByte(mask, in[i])
+			if maskSize == 8 {
 				return bestStart, bestGain
 			}
 		}
-		_, _, gain, ok = recalculateWindowMaskGain(in, mask, notMask, newStart, end-newStart)
+		_, gain, ok = recalculateWindowMaskGain(in, mask, newStart, end-newStart)
 		if !ok {
 			return bestStart, bestGain
 		}
-		if gain <= bestGain {
+		if gain < bestGain {
 			break
 		}
 		bestStart = newStart
@@ -81,7 +71,7 @@ func CreateMaskedSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
 	inLen := len(in)
 	const minSize = 6
 	for i := 0; i < inLen-minSize-1; i++ {
-		bestGain := 0
+		bestGain := math.MinInt
 		bestStart := i
 		bestEnd := i
 		if bestEnd > inLen {
@@ -101,7 +91,8 @@ func CreateMaskedSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
 				break
 			}
 		}
-		if seg := NewMaskedSegment(WithBuffer(in[bestStart:bestEnd+1]), bestStart); seg.GetCompressionGains() > 0 {
+		// println(bestStart, bestEnd, bestGain)
+		if seg := NewMaskedSegment(in[bestStart:bestEnd+1], bestStart); seg.GetCompressionGains() > 0 {
 			list.AppendValue(seg)
 			i = bestEnd
 		}
