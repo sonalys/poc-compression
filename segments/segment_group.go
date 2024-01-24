@@ -39,7 +39,7 @@ func (s *SegmentGroup) appendPos(pos ...int) *SegmentGroup {
 	return s
 }
 
-func (s *SegmentGroup) Decompress() []byte {
+func (s *SegmentGroup) Decompress(pos int) []byte {
 	return compression.DecompressBuffer(s.bitMask, s.invertMask, s.buffer, s.byteCount)
 }
 

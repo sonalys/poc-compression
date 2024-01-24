@@ -7,63 +7,67 @@ import (
 	ll "github.com/sonalys/gompressor/linkedlist"
 )
 
-func recalculateWindowMaskGain(in []byte, mask byte, pos, size int) (byte, int, bool) {
-	mask, _, _, sizeMask := compression.MaskRegisterByte(mask, in[pos])
-	if sizeMask == 8 {
-		return mask, math.MinInt, false
+func recalculateWindowMaskGain(in []byte, enableInvert bool, mask byte, pos, size int) (newMask byte, gain int, invert, ok bool) {
+	mask, shouldEnableInvert, _, maskSize := compression.MaskRegisterByte(mask, in[pos])
+	enableInvert = enableInvert || shouldEnableInvert
+	if enableInvert {
+		maskSize++
 	}
-	compressedSize := (size*sizeMask + 8 - 1) / 8
-	gain := size - compressedSize
-	return mask, gain, true
+	if maskSize == 8 {
+		return mask, math.MinInt, enableInvert, false
+	}
+	compressedSize := (size*maskSize + 8 - 1) / 8
+	return mask, size - compressedSize, enableInvert, true
 }
 
-func getBestEnd(in []byte, start, bestEnd, bestGain int) (int, int) {
-	inLen := len(in)
+func getBestEnd(in []byte, enableInvert bool, start, bestEnd, bestGain int) (int, int, bool) {
 	var mask byte
-	var gain int
-	var maskSize int
-	var ok bool
-	for i := start; i <= bestEnd; i++ {
-		mask, _, _, maskSize = compression.MaskRegisterByte(mask, in[i])
-		if maskSize == 8 {
-			return bestEnd, gain
-		}
+	var gain, maskSize int
+	var ok, curInvert bool
+	mask, maskSize, curInvert, _ = compression.MaskRegisterBuffer(in[start : bestEnd+1])
+	enableInvert = enableInvert || curInvert
+	if enableInvert {
+		maskSize++
 	}
-	for newEnd := bestEnd + 1; bestEnd < inLen-1; newEnd++ {
-		mask, gain, ok = recalculateWindowMaskGain(in, mask, newEnd, newEnd-start)
+	if maskSize == 8 {
+		return bestEnd, gain, enableInvert
+	}
+	for newEnd := bestEnd + 1; bestEnd < len(in)-1; newEnd++ {
+		mask, gain, curInvert, ok = recalculateWindowMaskGain(in, enableInvert, mask, newEnd, newEnd-start)
 		if !ok || gain < bestGain {
 			break
 		}
+		enableInvert = enableInvert || curInvert
 		bestEnd = newEnd
 		bestGain = gain
 	}
-	return bestEnd, bestGain
+	return bestEnd, bestGain, enableInvert
 }
 
-func getBestStart(in []byte, bestStart, end, bestGain int, minSize int) (int, int) {
+func getBestStart(in []byte, enableInvert bool, bestStart, end, bestGain int, minSize int) (int, int, bool) {
+	var gain, maskSize int
+	var ok, curInvert bool
 	for newStart := bestStart + 1; bestStart+minSize < end; newStart++ {
 		var mask byte
-		var maskSize int
-		var gain int
-		var ok bool
 		// We are removing the first byte, so we always have to recalculate the masks.
 		for i := newStart; i <= end; i++ {
-			mask, _, _, maskSize = compression.MaskRegisterByte(mask, in[i])
-			if maskSize == 8 {
-				return bestStart, bestGain
+			mask, enableInvert, _, maskSize = compression.MaskRegisterByte(mask, in[i])
+			if maskSize == 8 || enableInvert && maskSize == 7 {
+				return bestStart, bestGain, enableInvert
 			}
 		}
-		_, gain, ok = recalculateWindowMaskGain(in, mask, newStart, end-newStart)
+		_, gain, curInvert, ok = recalculateWindowMaskGain(in, enableInvert, mask, newStart, end-newStart)
 		if !ok {
-			return bestStart, bestGain
+			break
 		}
 		if gain < bestGain {
 			break
 		}
+		enableInvert = enableInvert || curInvert
 		bestStart = newStart
 		bestGain = gain
 	}
-	return bestStart, bestGain
+	return bestStart, bestGain, enableInvert
 }
 
 func CreateMaskedSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
@@ -74,22 +78,26 @@ func CreateMaskedSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
 		bestGain := math.MinInt
 		bestStart := i
 		bestEnd := i
+		enableInvert := false
 		if bestEnd > inLen {
 			bestEnd = inLen
 		}
+		prevBestGain := bestGain
 		for {
-			prevGain := bestGain
-			if newEnd, gain := getBestEnd(in, bestStart, bestEnd, bestGain); gain > bestGain {
+			if newEnd, gain, invert := getBestEnd(in, enableInvert, bestStart, bestEnd, bestGain); gain > bestGain {
 				bestEnd = newEnd
 				bestGain = gain
+				enableInvert = enableInvert || invert
 			}
-			if newStart, gain := getBestStart(in, bestStart, bestEnd, bestGain, minSize); gain > bestGain {
+			if newStart, gain, invert := getBestStart(in, enableInvert, bestStart, bestEnd, bestGain, minSize); gain > bestGain {
 				bestStart = newStart
 				bestGain = gain
+				enableInvert = enableInvert || invert
 			}
-			if prevGain == bestGain {
+			if prevBestGain == bestGain {
 				break
 			}
+			prevBestGain = bestGain
 		}
 		// println(bestStart, bestEnd, bestGain)
 		if seg := NewMaskedSegment(in[bestStart:bestEnd+1], bestStart); seg.GetCompressionGains() > 0 {

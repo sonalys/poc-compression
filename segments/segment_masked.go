@@ -21,7 +21,7 @@ func NewMaskedSegment(buffer []byte, pos int) *SegmentMasked {
 	return seg
 }
 
-func (s *SegmentMasked) Decompress() []byte {
+func (s *SegmentMasked) Decompress(pos int) []byte {
 	return compression.DecompressBuffer(s.bitMask, s.enableInvert, s.buffer, s.byteCount)
 }
 

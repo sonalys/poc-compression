@@ -8,10 +8,10 @@ func MaskRegisterBuffer(buffer []byte) (mask byte, maskSize int, enableInvert bo
 		var shouldEnableInvert bool
 		var byteInvert bool
 		mask, shouldEnableInvert, byteInvert, maskSize = MaskRegisterByte(mask, b)
-		if maskSize == 8 {
+		enableInvert = enableInvert || shouldEnableInvert
+		if maskSize == 8 || shouldEnableInvert && maskSize == 7 {
 			return
 		}
-		enableInvert = enableInvert || shouldEnableInvert
 		if byteInvert {
 			invertList[i] = true
 		}
@@ -24,7 +24,7 @@ func MaskRegisterByte(m byte, value byte) (mask byte, enableInvert, byteInvert b
 	inverted := m | ^value
 	// If we are using 7 bits or more on both masks, we won't save any space.
 	// So we just return the original input with a full mask.
-	if normal > 253 && inverted > 253 {
+	if normal == 255 && inverted == 255 {
 		return 0xff, false, false, 8
 	}
 	invertedSize := Count1Bits(inverted)
@@ -96,7 +96,7 @@ func DecompressByte(compressBits []int, enableInvert bool, value byte) (resp byt
 
 func CompressBuffer(in []byte) (mask byte, enableInvert bool, compressed []byte) {
 	mask, maskSize, enableInvert, invertList := MaskRegisterBuffer(in)
-	if maskSize == 8 {
+	if maskSize == 8 || enableInvert && maskSize == 7 {
 		return 0xff, enableInvert, in
 	}
 	if !enableInvert && maskSize == 0 {

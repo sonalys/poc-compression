@@ -1,7 +1,7 @@
 package segments
 
 type Segment interface {
-	Decompress() []byte
+	Decompress(pos int) []byte
 	Encode() []byte
 	GetCompressionGains() int
 	GetOriginalSize() int

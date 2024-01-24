@@ -25,7 +25,7 @@ func TestCreateRepeatingSegments(t *testing.T) {
 		require.Empty(t, uncompressed)
 		require.Equal(t, 1, list.Len)
 		seg := list.Head.Value
-		require.Equal(t, []byte{1, 2, 3, 4}, seg.Decompress())
+		require.Equal(t, []byte{1, 2, 3, 4}, seg.Decompress(1))
 		require.Equal(t, []int{0, 4, 8}, seg.GetPos())
 	})
 	t.Run("single repeating pattern, no overlap", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestCreateRepeatingSegments(t *testing.T) {
 		require.Empty(t, uncompressed)
 		require.Equal(t, 1, list.Len)
 		seg := list.Head.Value
-		require.Equal(t, []byte{0, 0, 0, 0}, seg.Decompress())
+		require.Equal(t, []byte{0, 0, 0, 0}, seg.Decompress(1))
 		require.Equal(t, []int{0, 4, 8}, seg.GetPos())
 	})
 	t.Run("overlap should not be an issue", func(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCreateRepeatingSegments(t *testing.T) {
 		require.Equal(t, []byte{1}, uncompressed)
 		require.Equal(t, 1, list.Len)
 		seg := list.Head.Value
-		require.Equal(t, []byte{1, 2, 3, 2}, seg.Decompress())
+		require.Equal(t, []byte{1, 2, 3, 2}, seg.Decompress(1))
 		require.Equal(t, []int{0, 4, 8}, seg.GetPos())
 	})
 	t.Run("overlap should not be an issue 2", func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestCreateRepeatingSegments(t *testing.T) {
 		list, uncompressed := CreateGroupSegments(buf)
 		require.Equal(t, 1, list.Len)
 		seg := list.Head.Value
-		require.Equal(t, []byte{1, 0, 0, 1}, seg.Decompress())
+		require.Equal(t, []byte{1, 0, 0, 1}, seg.Decompress(1))
 		require.Equal(t, []int{2, 8}, seg.GetPos())
 		require.Equal(t, []byte{0, 0, 0, 0}, uncompressed)
 	})

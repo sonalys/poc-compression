@@ -30,7 +30,7 @@ func (s *SegmentSameChar) appendPos(pos ...int) *SegmentSameChar {
 	return s
 }
 
-func (s *SegmentSameChar) Decompress() []byte {
+func (s *SegmentSameChar) Decompress(pos int) []byte {
 	return bytes.Repeat([]byte{s.char}, s.repeat)
 }
 

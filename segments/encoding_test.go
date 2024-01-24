@@ -16,7 +16,7 @@ func Test_SegmentEncoding(t *testing.T) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
-		require.Equal(t, buf, got.Decompress())
+		require.Equal(t, buf, got.Decompress(1))
 	})
 
 	t.Run("masked segment with zero mask and no invert", func(t *testing.T) {
@@ -28,7 +28,7 @@ func Test_SegmentEncoding(t *testing.T) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
-		require.Equal(t, buf, got.Decompress())
+		require.Equal(t, buf, got.Decompress(1))
 	})
 
 	t.Run("masked segment with zero mask and invert", func(t *testing.T) {
@@ -40,7 +40,7 @@ func Test_SegmentEncoding(t *testing.T) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
-		require.Equal(t, buf, got.Decompress())
+		require.Equal(t, buf, got.Decompress(1))
 	})
 
 	t.Run("group segment", func(t *testing.T) {
