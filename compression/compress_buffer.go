@@ -1,6 +1,10 @@
 package compression
 
-import "bytes"
+import (
+	"bytes"
+
+	"github.com/sonalys/gompressor/bitbuffer"
+)
 
 func MaskRegisterBuffer(buffer []byte) (mask byte, maskSize int, enableInvert bool, invertList []bool) {
 	invertList = make([]bool, len(buffer))
@@ -55,10 +59,6 @@ func GetMaskBits(mask byte) []int {
 	return compressedBits
 }
 
-func Byte2Bool(b byte) bool {
-	return b != 0
-}
-
 func Bool2Byte(b bool) byte {
 	if b {
 		return 1
@@ -94,7 +94,7 @@ func DecompressByte(compressBits []int, enableInvert bool, value byte) (resp byt
 	return resp
 }
 
-func CompressBuffer(in []byte) (mask byte, enableInvert bool, compressed []byte) {
+func CompressBuffer(in []byte) (byte, bool, []byte) {
 	mask, maskSize, enableInvert, invertList := MaskRegisterBuffer(in)
 	if maskSize == 8 || enableInvert && maskSize == 7 {
 		return 0xff, enableInvert, in
@@ -108,29 +108,12 @@ func CompressBuffer(in []byte) (mask byte, enableInvert bool, compressed []byte)
 	}
 	compBitsSize := len(in) * maskSize
 	compLen := (compBitsSize + 8 - 1) / 8
-	compressed = make([]byte, compLen)
+	w := bitbuffer.NewBitBuffer(make([]byte, 0, compLen))
 	compressedBits := GetMaskBits(mask)
 	for i, char := range in {
-		pos := i * maskSize
-		bytePos := ((pos / 8) + 1) * 8
-		offset := pos + maskSize - bytePos
-		if offset <= 0 {
-			compressed[pos/8] |= CompressByte(compressedBits, enableInvert, invertList[i], char) << -offset
-			continue
-		}
-		value := CompressByte(compressedBits, enableInvert, invertList[i], char)
-		compressed[pos/8] |= value >> offset
-		compressed[pos/8+1] |= value << (8 - offset)
+		w.Write(CompressByte(compressedBits, enableInvert, invertList[i], char), maskSize)
 	}
-	return mask, enableInvert, compressed
-}
-
-func createFilterMask(maskSize int) byte {
-	var filterMask byte
-	for i := 0; i < maskSize; i++ {
-		filterMask |= 1 << i
-	}
-	return filterMask
+	return mask, enableInvert, w.Buffer
 }
 
 func DecompressBuffer(mask byte, enableInvert bool, compressed []byte, compressedLen int) []byte {
@@ -138,26 +121,17 @@ func DecompressBuffer(mask byte, enableInvert bool, compressed []byte, compresse
 		return compressed
 	}
 	maskSize := Count1Bits(mask)
-	if !enableInvert && maskSize == 0 {
+	if enableInvert {
+		maskSize++
+	} else if maskSize == 0 {
 		buf := []byte{0}
 		return bytes.Repeat(buf, compressedLen)
 	}
-	if enableInvert {
-		maskSize++
-	}
+	r := bitbuffer.NewBitBuffer(compressed)
 	compressedBits := GetMaskBits(mask)
-	buf := make([]byte, 0, compressedLen)
-	filterMask := createFilterMask(maskSize)
+	out := make([]byte, 0, compressedLen)
 	for pos := 0; pos < compressedLen*maskSize; pos += maskSize {
-		bytePos := pos / 8
-		offset := pos + maskSize - ((bytePos + 1) * 8)
-		if offset <= 0 {
-			value := compressed[bytePos] & (filterMask << -offset) >> -offset
-			buf = append(buf, DecompressByte(compressedBits, enableInvert, value))
-			continue
-		}
-		value := compressed[bytePos]&(filterMask>>offset)<<offset + compressed[bytePos+1]>>(8-offset)
-		buf = append(buf, DecompressByte(compressedBits, enableInvert, value))
+		out = append(out, DecompressByte(compressedBits, enableInvert, r.Read(pos, maskSize)))
 	}
-	return buf
+	return out
 }
