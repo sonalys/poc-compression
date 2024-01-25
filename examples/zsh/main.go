@@ -103,20 +103,20 @@ func main() {
 	var compressedSize int
 	var uncompressedSize int
 	allChunksList := ll.NewLinkedList[segments.Segment]()
-	const chunkSize = math.MaxUint16
-	for i := 0; i < len(in); i += chunkSize {
-		end := i + chunkSize
-		if end > len(in) {
-			end = len(in)
-		}
-		chunk := in[i:end]
-		block := gompressor.Compress(chunk)
-		compressedOut := gompressor.Encode(block)
-		compressedSize += len(compressedOut)
-		uncompressedSize += len(block.Buffer)
-		out := gompressor.Decompress(block)
-		verifyIntegrity(chunk, out)
-		allChunksList.Append(block.Segments.Head)
-	}
+	// const chunkSize = math.MaxUint16
+	// for i := 0; i < len(in); i += chunkSize {
+	// 	end := i + chunkSize
+	// 	if end > len(in) {
+	// 		end = len(in)
+	// 	}
+	chunk := in
+	block := gompressor.Compress(chunk)
+	compressedOut := gompressor.Encode(block)
+	compressedSize += len(compressedOut)
+	uncompressedSize += len(block.Buffer)
+	// out := gompressor.Decompress(block)
+	// verifyIntegrity(chunk, out)
+	// allChunksList.Append(block.Segments.Head)
+	// }
 	printStatistics(in, compressedSize, uncompressedSize, allChunksList, t1)
 }

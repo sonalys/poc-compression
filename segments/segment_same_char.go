@@ -48,18 +48,7 @@ func getStorageByteSize(n int) int {
 }
 
 func calculateSameCharCompressedSize(posLen, repeat, maxPos int) int {
-	var compressedSize int = 1
-	if posLen > 1 {
-		compressedSize += getStorageByteSize(posLen)
-	}
-	if repeat > math.MaxUint8 {
-		compressedSize += 2
-	} else {
-		compressedSize += 1
-	}
-	compressedSize += posLen * getStorageByteSize(maxPos)
-	compressedSize += 1
-	return compressedSize
+	return 0
 }
 
 func (s *SegmentSameChar) getCompressedSize() int {
@@ -86,28 +75,14 @@ func (s *SegmentSameChar) GetType() SegmentType {
 
 func (s *SegmentSameChar) Encode() []byte {
 	buffer := make([]byte, 0, s.getCompressedSize())
-	posLen := len(s.pos)
-
 	meta := MetaSameChar{
 		Type:       TypeSameChar,
-		SinglePos:  posLen == 1,
 		RepeatSize: NewMaxSize(s.repeat),
-		PosLenSize: NewMaxSize(posLen),
-		PosSize:    NewMaxSize(s.maxPos),
 	}
-
 	if meta.RepeatSize >= 2 {
 		panic("sameCharSegment repeat overflow 2 bytes")
 	}
-
-	buffer = append(buffer, meta.ToByte())
 	buffer = encodingFunc[meta.RepeatSize](buffer, s.repeat)
-	if meta.SinglePos {
-		buffer = encodingFunc[meta.PosSize](buffer, s.pos[0])
-	} else {
-		buffer = encodingFunc[meta.PosLenSize](buffer, posLen)
-		buffer = append(buffer, encodePos(s.maxPos, s.pos)...)
-	}
 	buffer = append(buffer, s.char)
 	return buffer
 }

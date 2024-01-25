@@ -102,6 +102,77 @@ func CreateSameCharSegments(in []byte) []byte {
 		}
 	}
 	raw := FillSegmentGaps(in, list)
+	w := newBitWriter(make([]byte, 0, len(in)))
+	cur := list.Head
+	for {
+		if cur == nil {
+			break
+		}
+		w.Write(cur.Value.Encode())
+		w.WriteByte(0b0, 1)
+		cur = cur.Next
+	}
+	w.WriteByte(0b1, 1)
 
-	return raw
+	orderedSegments := SortAndFilterSegments(list, false, removeBadSegments)
+	var prev int
+	for i, cur := range orderedSegments {
+		if cur.Pos-prev > 0 {
+			w.WriteByte(0b00, 2)
+			w.Write(raw[prev:cur.Pos])
+		}
+		prev = cur.Pos
+		w.WriteByte(0b01, 2)
+		w.WriteByte(byte(i), 8)
+	}
+	if len(raw)-prev > 0 {
+		w.WriteByte(0b00, 2)
+		w.Write(raw[prev:])
+	}
+	w.WriteByte(0b11, 2)
+	return w.buffer
+}
+
+type bitWriter struct {
+	buffer []byte
+	pos    int
+}
+
+func newBitWriter(buf []byte) bitWriter {
+	return bitWriter{
+		buffer: buf,
+	}
+}
+
+func (b *bitWriter) WriteByte(in byte, size int) {
+	bytePos := b.pos / 8
+	if len(b.buffer) == bytePos {
+		b.buffer = append(b.buffer, 0)
+	}
+	offset := b.pos + size - ((bytePos + 1) * 8)
+	b.pos += size
+	if offset <= 0 {
+		b.buffer[bytePos] |= in << -offset
+		return
+	}
+	b.buffer[bytePos] |= in >> offset
+	b.buffer = append(b.buffer, in<<(8-offset))
+}
+
+func (b *bitWriter) ReadByte(pos, size int) byte {
+	bytePos := pos / 8
+	offset := pos + size - ((bytePos + 1) * 8)
+	if offset <= 0 {
+		value := b.buffer[bytePos] >> -offset
+		return value
+	}
+	cleanOffset := 8 - size - offset
+	value := b.buffer[bytePos]<<cleanOffset>>cleanOffset + b.buffer[bytePos+1]>>(8-offset)
+	return value
+}
+
+func (b *bitWriter) Write(in []byte) {
+	for _, value := range in {
+		b.WriteByte(value, 8)
+	}
 }
