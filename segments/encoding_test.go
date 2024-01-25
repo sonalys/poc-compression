@@ -12,7 +12,7 @@ func Test_SegmentEncoding(t *testing.T) {
 		segment := NewMaskedSegment(buf, 1)
 		buffer := segment.Encode()
 		got, pos := DecodeSegment(buffer)
-		if pos != int(len(buffer)) {
+		if pos != len(buffer) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
@@ -24,7 +24,7 @@ func Test_SegmentEncoding(t *testing.T) {
 		segment := NewMaskedSegment(buf, 1)
 		buffer := segment.Encode()
 		got, pos := DecodeSegment(buffer)
-		if pos != int(len(buffer)) {
+		if pos != len(buffer) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
@@ -36,7 +36,7 @@ func Test_SegmentEncoding(t *testing.T) {
 		segment := NewMaskedSegment(buf, 1)
 		buffer := segment.Encode()
 		got, pos := DecodeSegment(buffer)
-		if pos != int(len(buffer)) {
+		if pos != len(buffer) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
@@ -47,7 +47,7 @@ func Test_SegmentEncoding(t *testing.T) {
 		segment := NewGroupSegment([]byte{255, 254, 244}, 1, 2, 3)
 		buffer := segment.Encode()
 		got, pos := DecodeSegment(buffer)
-		if pos != int(len(buffer)) {
+		if pos != len(buffer) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
@@ -57,7 +57,7 @@ func Test_SegmentEncoding(t *testing.T) {
 		segment := NewRepeatSegment(2, 1, 1, 2, 3)
 		buffer := segment.Encode()
 		got, pos := DecodeSegment(buffer)
-		if pos != int(len(buffer)) {
+		if pos != len(buffer) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)
@@ -71,7 +71,7 @@ func Test_SegmentEncoding(t *testing.T) {
 		segment := NewRepeatSegment(300, 255, posList...)
 		buffer := segment.Encode()
 		got, pos := DecodeSegment(buffer)
-		if pos != int(len(buffer)) {
+		if pos != len(buffer) {
 			t.Fatalf("decode returned wrong buffer position")
 		}
 		require.Equal(t, segment, got)

@@ -21,30 +21,22 @@ var paths = []string{
 func printStatistics(in []byte, compressedSize, uncompressedSize int, list *ll.LinkedList[segments.Segment], t1 time.Time) {
 	var segmentCount int
 	var minGain, maxGain int = math.MaxInt, 0
-	cur := list.Head
 
 	typeCount := map[segments.SegmentType]int{}
 	typeGain := map[segments.SegmentType]int{}
 
-	for {
-		if cur == nil {
-			break
-		}
+	list.ForEach(func(cur *ll.ListEntry[segments.Segment]) {
 		segmentCount++
-
 		gain := cur.Value.GetCompressionGains()
 		t := cur.Value.GetType()
-
 		typeCount[t] += len(cur.Value.GetPos())
 		typeGain[t] += gain
-
 		if gain > maxGain {
 			maxGain = gain
 		} else if gain < minGain {
 			minGain = gain
 		}
-		cur = cur.Next
-	}
+	})
 
 	ratio := float64(compressedSize) / float64(len(in))
 	fmt.Printf(`ratio:				%.2f (%d / %d)
@@ -58,8 +50,8 @@ took:				%s
 `,
 		ratio,
 		compressedSize,
-		int(len(in)),
-		int(len(in))-compressedSize,
+		len(in),
+		len(in)-compressedSize,
 		uncompressedSize,
 		len(in)-uncompressedSize,
 		segmentCount,

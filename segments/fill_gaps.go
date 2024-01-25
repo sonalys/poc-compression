@@ -15,18 +15,14 @@ type SegmentPosMap struct {
 
 func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters ...func(*ll.ListEntry[Segment]) bool) []SegmentPosMap {
 	out := make([]SegmentPosMap, 0, list.Len)
-	cur := list.Head
-	for {
-		if cur == nil {
-			break
-		}
+	list.ForEach(func(cur *ll.ListEntry[Segment]) {
 		curValue := cur.Value
 		if len(cur.Value.GetPos()) == 0 {
-			goto final
+			return
 		}
 		for _, filter := range filters {
 			if !filter(cur) {
-				goto final
+				return
 			}
 		}
 		for _, pos := range curValue.GetPos() {
@@ -36,9 +32,7 @@ func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters 
 				Segment: curValue,
 			})
 		}
-	final:
-		cur = cur.Next
-	}
+	})
 	sort.Slice(out, func(i, j int) bool {
 		if sortType {
 			t1, t2 := out[i].GetType(), out[j].GetType()

@@ -24,6 +24,17 @@ func (l *LinkedList[T]) AppendValue(value T) *LinkedList[T] {
 	return l.Append(entry)
 }
 
+func (l *LinkedList[T]) ForEach(f func(*ListEntry[T])) {
+	cur := l.Head
+	for {
+		if cur == nil {
+			break
+		}
+		f(cur)
+		cur = cur.Next
+	}
+}
+
 // Append adds a segment after the current.
 func (l *LinkedList[T]) Append(entry *ListEntry[T]) *LinkedList[T] {
 	if entry == nil {
@@ -76,4 +87,15 @@ func (l *ListEntry[T]) Tail() *ListEntry[T] {
 		cur = cur.Next
 	}
 	return cur
+}
+
+func (l *ListEntry[T]) ForEach(f func(*ListEntry[T])) {
+	cur := l
+	for {
+		if cur == nil {
+			break
+		}
+		f(cur)
+		cur = cur.Next
+	}
 }

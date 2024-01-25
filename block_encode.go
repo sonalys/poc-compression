@@ -1,6 +1,11 @@
 package gompressor
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	ll "github.com/sonalys/gompressor/linkedlist"
+	"github.com/sonalys/gompressor/segments"
+)
 
 var encoder = binary.BigEndian
 
@@ -9,16 +14,8 @@ func Encode(b *Block) []byte {
 	out = encoder.AppendUint64(out, uint64(b.OriginalSize))
 	out = encoder.AppendUint64(out, uint64(len(b.Buffer)))
 	out = append(out, b.Buffer...)
-	if b.Segments == nil {
-		return out
-	}
-	cur := b.Segments.Head
-	for {
-		if cur == nil {
-			break
-		}
+	b.Segments.ForEach(func(cur *ll.ListEntry[segments.Segment]) {
 		out = append(out, cur.Value.Encode()...)
-		cur = cur.Next
-	}
+	})
 	return out
 }
