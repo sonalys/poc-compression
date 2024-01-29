@@ -3,6 +3,7 @@ package segments
 import (
 	"math"
 
+	"github.com/sonalys/gompressor/bitbuffer"
 	"github.com/sonalys/gompressor/compression"
 	ll "github.com/sonalys/gompressor/linkedlist"
 )
@@ -70,10 +71,10 @@ func getBestStart(in []byte, enableInvert bool, bestStart, end, bestGain int, mi
 	return bestStart, bestGain, enableInvert
 }
 
-func CreateMaskedSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
-	list := &ll.LinkedList[Segment]{}
+func maskedCompress(in []byte) (*ll.LinkedList[*SegmentMasked], []byte) {
+	list := &ll.LinkedList[*SegmentMasked]{}
 	inLen := len(in)
-	const minSize = 6
+	const minSize = 3
 	for i := 0; i < inLen-minSize-1; i++ {
 		bestGain := math.MinInt
 		bestStart := i
@@ -106,4 +107,19 @@ func CreateMaskedSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
 		}
 	}
 	return list, FillSegmentGaps(in, list)
+}
+
+func CreateMaskedSegments(in []byte) []byte {
+	list, _ := maskedCompress(in)
+	w := bitbuffer.NewBitBuffer(make([]byte, 0, len(in)))
+	var prev int
+	for _, cur := range SortAndFilterSegments(list, false) {
+		w.WriteBuffer(in[prev:cur.Pos])
+		prev = cur.Pos + cur.Segment.byteCount
+		cur.Segment.Encode(w)
+	}
+	if len(in)-prev > 0 {
+		w.WriteBuffer(in[prev:])
+	}
+	return w.Buffer
 }

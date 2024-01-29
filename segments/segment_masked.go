@@ -1,6 +1,7 @@
 package segments
 
 import (
+	"github.com/sonalys/gompressor/bitbuffer"
 	"github.com/sonalys/gompressor/compression"
 )
 
@@ -27,8 +28,6 @@ func (s *SegmentMasked) Decompress(pos int) []byte {
 
 func calculateMaskedCompressedSize(mask byte, enableInvert bool, uncompressedBufLen, pos int) int {
 	compressedSize := 2
-	compressedSize += getStorageByteSize(uncompressedBufLen)
-	compressedSize += getStorageByteSize(pos)
 	maskSize := compression.Count1Bits(mask)
 	if enableInvert {
 		maskSize++
@@ -57,20 +56,10 @@ func (s *SegmentMasked) GetType() SegmentType {
 	return TypeMasked
 }
 
-func (s *SegmentMasked) Encode() []byte {
-	buffer := make([]byte, 0, s.getCompressedSize())
-	meta := MetaMaskedGroup{
-		Type:       TypeMasked,
-		InvertMask: s.enableInvert,
-		PosSize:    NewMaxSize(s.pos),
-		BufLenSize: NewMaxSize(s.byteCount),
-	}
-	buffer = append(buffer, meta.ToByte())
-	buffer = append(buffer, s.bitMask)
-	buffer = encodingFunc[meta.PosSize](buffer, s.pos)
-	buffer = encodingFunc[meta.BufLenSize](buffer, s.byteCount)
-	buffer = append(buffer, s.buffer...)
-	return buffer
+func (s *SegmentMasked) Encode(w *bitbuffer.BitBuffer) {
+	w.Write(s.bitMask, 8)
+	w.WriteBuffer(encodingFunc[0](nil, s.byteCount))
+	w.WriteBuffer(s.buffer)
 }
 
 func DecodeMasked(b []byte) (*SegmentMasked, int) {

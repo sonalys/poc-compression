@@ -13,8 +13,8 @@ func Decode(in []byte) (out *Block, err error) {
 	lenIn := len(in)
 	var pos int
 	out = &Block{
-		OriginalSize: int(decoder.Uint64(in)),
-		Segments:     &ll.LinkedList[segments.Segment]{},
+		// OriginalSize: int(decoder.Uint64(in)),
+		Segments: &ll.LinkedList[segments.Segment]{},
 	}
 	bufLen := int(decoder.Uint64(in[8:]))
 	pos += 16

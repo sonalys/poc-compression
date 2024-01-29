@@ -1,8 +1,10 @@
 package segments
 
+import "github.com/sonalys/gompressor/bitbuffer"
+
 type Segment interface {
 	Decompress(pos int) []byte
-	Encode() []byte
+	Encode(w *bitbuffer.BitBuffer)
 	GetCompressionGains() int
 	GetOriginalSize() int
 	GetPos() []int

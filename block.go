@@ -9,7 +9,6 @@ import (
 type BlockSize = constraints.Unsigned
 
 type Block struct {
-	OriginalSize int
-	Segments     *ll.LinkedList[segments.Segment]
-	Buffer       []byte
+	Segments *ll.LinkedList[segments.Segment]
+	Buffer   []byte
 }

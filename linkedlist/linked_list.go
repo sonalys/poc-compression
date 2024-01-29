@@ -1,17 +1,17 @@
 package linkedlist
 
-type ListEntry[T comparable] struct {
+type ListEntry[T any] struct {
 	Value      T
 	Prev, Next *ListEntry[T]
 	Ref        *LinkedList[T]
 }
 
-type LinkedList[T comparable] struct {
+type LinkedList[T any] struct {
 	Head, Tail *ListEntry[T]
 	Len        int
 }
 
-func NewLinkedList[T comparable]() *LinkedList[T] {
+func NewLinkedList[T any]() *LinkedList[T] {
 	return &LinkedList[T]{}
 }
 

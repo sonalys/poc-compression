@@ -1,6 +1,7 @@
 package segments
 
 import (
+	"github.com/sonalys/gompressor/bitbuffer"
 	"github.com/sonalys/gompressor/compression"
 )
 
@@ -74,8 +75,7 @@ func (s *SegmentGroup) GetType() SegmentType {
 	return TypeGroup
 }
 
-func (s *SegmentGroup) Encode() []byte {
-	buffer := make([]byte, 0, s.getCompressedSize())
+func (s *SegmentGroup) Encode(w *bitbuffer.BitBuffer) {
 	posLen := len(s.pos)
 	meta := MetaRepeatGroup{
 		Type:       TypeGroup,
@@ -84,13 +84,11 @@ func (s *SegmentGroup) Encode() []byte {
 		PosSize:    NewMaxSize(s.maxPos),
 		BufLenSize: NewMaxSize(s.byteCount),
 	}
-	buffer = append(buffer, meta.ToByte())
-	buffer = append(buffer, s.bitMask)
-	buffer = encodingFunc[meta.PosLenSize](buffer, posLen)
-	buffer = append(buffer, encodePos(s.maxPos, s.pos)...)
-	buffer = encodingFunc[meta.BufLenSize](buffer, s.byteCount)
-	buffer = append(buffer, s.buffer...)
-	return buffer
+	w.Write(meta.ToByte(), 8)
+	w.Write(s.bitMask, 8)
+	w.WriteBuffer(encodePos(s.maxPos, s.pos))
+	w.WriteBuffer(encodingFunc[meta.BufLenSize](nil, s.byteCount))
+	w.WriteBuffer(s.buffer)
 }
 
 func DecodeGroup(b []byte) (*SegmentGroup, int) {

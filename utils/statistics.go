@@ -41,12 +41,16 @@ func PrintStatistics(in []byte, compressedSize, uncompressedSize int, list *ll.L
 		{"Ratio", ratio},
 		{"Compressed Size", compressedSize},
 		{"Original Size", len(in)},
-		{"Segments Count", segmentCount},
-		{"Min Gain", minGain},
-		{"Max Gain", maxGain},
+		// {"Segments Count", segmentCount},
+		// {"Min Gain", minGain},
+		// {"Max Gain", maxGain},
 		{"Duration", time.Since(t1).String()},
 	})
 	println(t.Render())
+
+	if list.Len == 0 {
+		return
+	}
 
 	t = table.NewWriter()
 	t.SetTitle("Count")

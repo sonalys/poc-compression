@@ -3,6 +3,8 @@ package segments
 import (
 	"bytes"
 	"math"
+
+	"github.com/sonalys/gompressor/bitbuffer"
 )
 
 type SegmentSameChar struct {
@@ -48,10 +50,7 @@ func getStorageByteSize(n int) int {
 }
 
 func calculateSameCharCompressedSize(posLen, repeat, maxPos int) int {
-	var compressedSize int = 1
-	if posLen > 1 {
-		compressedSize += getStorageByteSize(posLen)
-	}
+	var compressedSize int
 	if repeat > math.MaxUint8 {
 		compressedSize += 2
 	} else {
@@ -84,32 +83,17 @@ func (s *SegmentSameChar) GetType() SegmentType {
 	return TypeSameChar
 }
 
-func (s *SegmentSameChar) Encode() []byte {
-	buffer := make([]byte, 0, s.getCompressedSize())
-	posLen := len(s.pos)
-
-	meta := MetaSameChar{
-		Type:       TypeSameChar,
-		SinglePos:  posLen == 1,
-		RepeatSize: NewMaxSize(s.repeat),
-		PosLenSize: NewMaxSize(posLen),
-		PosSize:    NewMaxSize(s.maxPos),
+func (s *SegmentSameChar) Encode(w *bitbuffer.BitBuffer) {
+	w.WriteBuffer(encodingFunc[1](nil, s.repeat))
+	for i, pos := range s.pos {
+		w.WriteBuffer(encodingFunc[2](nil, pos))
+		if i == len(s.pos)-1 {
+			w.Write(0b1, 1)
+			break
+		}
+		w.Write(0b0, 1)
 	}
-
-	if meta.RepeatSize >= 2 {
-		panic("sameCharSegment repeat overflow 2 bytes")
-	}
-
-	buffer = append(buffer, meta.ToByte())
-	buffer = encodingFunc[meta.RepeatSize](buffer, s.repeat)
-	if meta.SinglePos {
-		buffer = encodingFunc[meta.PosSize](buffer, s.pos[0])
-	} else {
-		buffer = encodingFunc[meta.PosLenSize](buffer, posLen)
-		buffer = append(buffer, encodePos(s.maxPos, s.pos)...)
-	}
-	buffer = append(buffer, s.char)
-	return buffer
+	w.Write(s.char, 8)
 }
 
 func DecodeSameChar(b []byte) (*SegmentSameChar, int) {

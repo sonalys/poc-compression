@@ -125,12 +125,12 @@ func appendUncollidedPos(posList []int, collision []bool, seg *SegmentGroup, sta
 }
 
 // CreateGroupSegments should linearly detect repeating groups, without overlapping.
-func CreateGroupSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
+func groupCompress(in []byte) (*ll.LinkedList[*SegmentGroup], []byte) {
 	bufLen := len(in)
 	byteMap := MapBytePos(in)
 	bytePop := GetBytePopularity(byteMap)
 	collision := make([]bool, bufLen)
-	list := ll.NewLinkedList[Segment]()
+	list := ll.NewLinkedList[*SegmentGroup]()
 	// We start by searching groups by the less frequent bytes.
 	for _, char := range bytePop {
 		posList := byteMap[char]
@@ -155,4 +155,9 @@ func CreateGroupSegments(in []byte) (*ll.LinkedList[Segment], []byte) {
 		list.AppendValue(segment)
 	}
 	return list, FillSegmentGaps(in, list)
+}
+
+func CreateGroupSegments(in []byte) []byte {
+	list, raw := groupCompress(in)
+	return encodeSegments(len(in), list, raw)
 }

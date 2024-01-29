@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"os"
 	"time"
 
@@ -24,26 +23,24 @@ func main() {
 	if err != nil {
 		panic("failed to read file")
 	}
-	// in = in[:10000]
 	var compressedSize int
-	var uncompressedSize int
 	allChunksList := ll.NewLinkedList[segments.Segment]()
-	const chunkSize = math.MaxUint16
-	for i := 0; i < len(in); i += chunkSize {
-		end := i + chunkSize
-		if end > len(in) {
-			end = len(in)
-		}
-		chunk := in[i:end]
-		block := gompressor.Compress(chunk)
-		compressedOut := gompressor.Encode(block)
-		compressedSize += len(compressedOut)
-		uncompressedSize += len(block.Buffer)
-		out := gompressor.Decompress(block)
-		if err := utils.IntegrityCheck(chunk, out); err != nil {
-			panic(err.Error())
-		}
-		allChunksList.Append(block.Segments.Head)
+	// const chunkSize = math.MaxUint16
+	// for i := 0; i < len(in); i += chunkSize {
+	// 	end := i + chunkSize
+	// 	if end > len(in) {
+	// 		end = len(in)
+	// 	}
+	// in = in[:100000]
+	// chunk := in
+	block := gompressor.Compress(in)
+	compressedOut := gompressor.Encode(block)
+	compressedSize = len(compressedOut)
+	out := gompressor.Decompress(block)
+	if err := utils.IntegrityCheck(in, out); err != nil {
+		panic(err.Error())
 	}
-	utils.PrintStatistics(in, compressedSize, uncompressedSize, allChunksList, t1)
+	// allChunksList.Append(block.Segments.Head)
+	// }
+	utils.PrintStatistics(in, compressedSize, 0, allChunksList, t1)
 }

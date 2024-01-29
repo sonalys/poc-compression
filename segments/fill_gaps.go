@@ -7,15 +7,15 @@ import (
 	ll "github.com/sonalys/gompressor/linkedlist"
 )
 
-type SegmentPosMap struct {
-	Pos int
-	Segment
-	Entry *ll.ListEntry[Segment]
+type SegmentPosMap[T Segment] struct {
+	Pos     int
+	Segment T
+	Entry   *ll.ListEntry[T]
 }
 
-func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters ...func(*ll.ListEntry[Segment]) bool) []SegmentPosMap {
-	out := make([]SegmentPosMap, 0, list.Len)
-	list.ForEach(func(cur *ll.ListEntry[Segment]) {
+func SortAndFilterSegments[T Segment](list *ll.LinkedList[T], sortType bool, filters ...func(*ll.ListEntry[T]) bool) []SegmentPosMap[T] {
+	out := make([]SegmentPosMap[T], 0, list.Len)
+	list.ForEach(func(cur *ll.ListEntry[T]) {
 		curValue := cur.Value
 		if len(cur.Value.GetPos()) == 0 {
 			return
@@ -26,7 +26,7 @@ func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters 
 			}
 		}
 		for _, pos := range curValue.GetPos() {
-			out = append(out, SegmentPosMap{
+			out = append(out, SegmentPosMap[T]{
 				Pos:     pos,
 				Entry:   cur,
 				Segment: curValue,
@@ -35,7 +35,7 @@ func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters 
 	})
 	sort.Slice(out, func(i, j int) bool {
 		if sortType {
-			t1, t2 := out[i].GetType(), out[j].GetType()
+			t1, t2 := out[i].Segment.GetType(), out[j].Segment.GetType()
 			// We layer the logic by segment type, so some segments should decompress first than others.
 			if t1 != t2 {
 				return t1 < t2
@@ -46,7 +46,7 @@ func SortAndFilterSegments(list *ll.LinkedList[Segment], sortType bool, filters 
 	return out
 }
 
-func removeBadSegments(entry *ll.ListEntry[Segment]) bool {
+func removeBadSegments[T Segment](entry *ll.ListEntry[T]) bool {
 	if entry.Value.GetCompressionGains() <= 0 {
 		entry.Remove()
 		return false
@@ -54,7 +54,7 @@ func removeBadSegments(entry *ll.ListEntry[Segment]) bool {
 	return true
 }
 
-func FillSegmentGaps(in []byte, list *ll.LinkedList[Segment]) []byte {
+func FillSegmentGaps[T Segment](in []byte, list *ll.LinkedList[T]) []byte {
 	var prev int
 	out := make([]byte, 0, len(in))
 	orderedSegments := SortAndFilterSegments(list, true, removeBadSegments)

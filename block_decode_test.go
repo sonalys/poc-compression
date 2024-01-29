@@ -10,9 +10,9 @@ import (
 
 func Test_BlockEncoding(t *testing.T) {
 	b := &Block{
-		OriginalSize: 100,
-		Segments:     &ll.LinkedList[segments.Segment]{},
-		Buffer:       []byte{1, 2, 3},
+		// OriginalSize: 100,
+		Segments: &ll.LinkedList[segments.Segment]{},
+		Buffer:   []byte{1, 2, 3},
 	}
 	encoded := Encode(b)
 	got, err := Decode(encoded)
