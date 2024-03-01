@@ -1,6 +1,6 @@
 module github.com/sonalys/gompressor
 
-go 1.21.5
+go 1.22
 
 require (
 	github.com/jedib0t/go-pretty/v6 v6.5.3
